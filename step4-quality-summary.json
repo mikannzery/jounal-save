@@ -1,0 +1,61 @@
+{
+  "clipsJson": {
+    "status": 200,
+    "contentType": "application/json; charset=utf-8",
+    "count": 1,
+    "titles": [
+      "???????? 1776661521660"
+    ],
+    "tags": [
+      [
+        "QA???1776661521660",
+        "qa-export-1776661521660"
+      ]
+    ],
+    "containsJapaneseTitle": true,
+    "containsJapaneseMemo": true
+  },
+  "archiveJson": {
+    "status": 200,
+    "count": 1,
+    "titles": [
+      "Archive Target 1776661521660"
+    ]
+  },
+  "favoritesCsv": {
+    "status": 200,
+    "contentType": "text/csv; charset=utf-8",
+    "firstLines": [
+      "body,created_at,domain,image_path,memo,tags,title,updated_at,url",
+      "\"????????????OG???CSV????????\",\"2026-04-20T05:05:22.963849+00:00\",\"example.com\",\"\",\"??_???\",\"QA???1776661521660 | qa-export-1776661521660\",\"???????? 1776661521660\",\"2026-04-20T05:05:22.963849+00:00\",\"https://example.com/\""
+    ],
+    "containsJapaneseTitle": true,
+    "containsJapaneseMemo": true
+  },
+  "fetchTitle": {
+    "openai": {
+      "status": 502,
+      "body": "{\"error\":\"Failed to fetch the page title.\"}"
+    },
+    "nhk": {
+      "status": 200,
+      "body": "{\"title\":\"NHK | 日本放送協会\"}"
+    },
+    "example": {
+      "status": 200,
+      "body": "{\"title\":\"Example Domain\"}"
+    },
+    "invalidUrl": {
+      "status": 400,
+      "body": "{\"error\":\"Enter a valid URL.\"}"
+    },
+    "httpError": {
+      "status": 502,
+      "body": "{\"error\":\"Failed to fetch the page title.\"}"
+    },
+    "networkError": {
+      "status": 502,
+      "body": "{\"error\":\"Failed to fetch the page title.\"}"
+    }
+  }
+}

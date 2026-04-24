@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+:root {
+  --ui-bg: #f4f4f1;
+  --ui-fg: #101010;
+  --ui-border: #101010;
+  --ui-border-soft: rgba(16, 16, 16, 0.82);
+  --ui-muted: rgba(16, 16, 16, 0.64);
+  --ui-soft: rgba(16, 16, 16, 0.12);
+  --panel-bg: #ffffff;
+  --panel-fg: #101010;
+  --button-bg: #ffffff;
+  --button-fg: #101010;
+  --button-hover-bg: #101010;
+  --button-hover-fg: #ffffff;
+  --button-disabled-bg: #ecece7;
+  --button-disabled-fg: #7a7a73;
+  --button-disabled-border: #b8b8b1;
+  --tag-neutral-bg: #ecece7;
+  --tag-neutral-fg: #101010;
+  --header-bg: #050505;
+  --header-fg: #ffffff;
+  --header-muted: rgba(255, 255, 255, 0.72);
+  --active-bg: #101010;
+  --active-fg: #ffffff;
+}
+
+html[data-theme="dark"] {
+  --ui-bg: #050505;
+  --ui-fg: #f6f5ef;
+  --ui-border: #f6f5ef;
+  --ui-border-soft: rgba(246, 245, 239, 0.82);
+  --ui-muted: rgba(246, 245, 239, 0.72);
+  --ui-soft: rgba(246, 245, 239, 0.14);
+  --panel-bg: #050505;
+  --panel-fg: #f6f5ef;
+  --button-bg: #050505;
+  --button-fg: #f6f5ef;
+  --button-hover-bg: #f6f5ef;
+  --button-hover-fg: #050505;
+  --button-disabled-bg: #151515;
+  --button-disabled-fg: #7f7f79;
+  --button-disabled-border: #6f6f6a;
+  --tag-neutral-bg: #2a2a2a;
+  --tag-neutral-fg: #f6f5ef;
+  --header-bg: #050505;
+  --header-fg: #ffffff;
+  --header-muted: rgba(255, 255, 255, 0.72);
+  --active-bg: #f6f5ef;
+  --active-fg: #050505;
+}
+
+html {
+  background: var(--ui-bg);
+}
+
+body {
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+main {
+  max-width: 1900px;
+}
+
+input,
+textarea,
+select {
+  background: var(--panel-bg);
+  color: var(--panel-fg);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--ui-muted);
+}
+
+img {
+  filter: none;
+}
+
+::selection {
+  background: var(--ui-fg);
+  color: var(--ui-bg);
+}
+
+.active-control {
+  background: var(--active-bg) !important;
+  color: var(--active-fg) !important;
+}
+
+.active-control:hover {
+  background: var(--button-hover-bg) !important;
+  color: var(--button-hover-fg) !important;
+}
+
+.active-control svg,
+.active-control span {
+  color: inherit;
+}
+
+.header-new-button {
+  color: #000 !important;
+  background: #fff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  overflow: visible !important;
+  line-height: 1 !important;
+}
+
+.header-new-button span,
+.header-new-button svg,
+.header-new-button path {
+  color: #000 !important;
+  stroke: currentColor;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
