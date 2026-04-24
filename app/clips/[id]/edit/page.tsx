@@ -31,6 +31,7 @@ export default async function EditClipPage({
       <ClipForm
         action={updateClipAction.bind(null, clip.id)}
         availableTags={tags}
+        allowInlineTagCreate
         cancelHref={`/clips/${clip.id}`}
         description="本文、URL、メモ、タグを見直して、保存済みの記事を更新できます。"
         heading="EDIT CLIP"

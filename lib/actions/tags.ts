@@ -5,18 +5,16 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireUser } from "@/lib/auth";
+import { createOrGetOwnedTag, DEFAULT_TAG_COLOR, tagColorSchema, tagNameSchema } from "@/lib/tags";
 
 const tagSchema = z.object({
-  color: z
-    .string()
-    .trim()
-    .regex(/^#[0-9A-Fa-f]{6}$/, "Choose a valid color."),
-  name: z.string().trim().min(1, "Tag name is required.").max(40, "Tag name must be 40 characters or less."),
+  color: tagColorSchema,
+  name: tagNameSchema,
 });
 
 function parseTagValues(formData: FormData) {
   return tagSchema.safeParse({
-    color: String(formData.get("color") ?? "#111111"),
+    color: String(formData.get("color") ?? DEFAULT_TAG_COLOR),
     name: String(formData.get("name") ?? ""),
   });
 }
@@ -39,15 +37,7 @@ export async function createTagAction(formData: FormData) {
   const { supabase, user } = await requireUser();
 
   try {
-    const { error } = await supabase.from("tags").insert({
-      color: parsed.data.color,
-      name: parsed.data.name,
-      user_id: user.id,
-    });
-
-    if (error) {
-      redirect("/tags?error=create");
-    }
+    await createOrGetOwnedTag(supabase, user.id, parsed.data);
   } catch {
     redirect("/tags?error=create");
   }

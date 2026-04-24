@@ -14,6 +14,7 @@ import type { ActionState, ClipFormValues, TagRow } from "@/types/clip";
 interface ClipFormProps {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   availableTags: TagRow[];
+  allowInlineTagCreate?: boolean;
   cancelHref: string;
   description: string;
   heading: string;
@@ -55,6 +56,7 @@ function getTagTextColor(backgroundColor?: string | null) {
 export function ClipForm({
   action,
   availableTags,
+  allowInlineTagCreate = false,
   cancelHref,
   description,
   heading,
@@ -72,6 +74,12 @@ export function ClipForm({
   const [isFetchingContent, setIsFetchingContent] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(() => initialImagePreviewUrl);
   const [imageLabel, setImageLabel] = useState(values.image_path ? "現在の画像" : "");
+  const [selectedTagIds, setSelectedTagIds] = useState(values.tagIds);
+  const [tagOptions, setTagOptions] = useState(availableTags);
+  const [isTagCreateOpen, setIsTagCreateOpen] = useState(false);
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [tagCreateMessage, setTagCreateMessage] = useState<{ text: string; tone: "error" | "success" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const objectUrlRef = useRef<string | null>(null);
 
@@ -137,6 +145,89 @@ export function ClipForm({
     }
 
     return fallbackMessage ?? "Failed to fetch the page content.";
+  }
+
+  function sortTagRows(rows: TagRow[]) {
+    return [...rows].sort((left, right) => left.name.localeCompare(right.name, "ja"));
+  }
+
+  function toggleTagSelection(tagId: string) {
+    setSelectedTagIds((current) =>
+      current.includes(tagId)
+        ? current.filter((value) => value !== tagId)
+        : [...current, tagId],
+    );
+  }
+
+  async function handleCreateTag() {
+    const trimmedName = newTagName.trim();
+
+    if (!trimmedName) {
+      setTagCreateMessage({
+        text: "Enter a tag name first.",
+        tone: "error",
+      });
+      return;
+    }
+
+    const existingTag = tagOptions.find(
+      (tag) => tag.name.trim().toLocaleLowerCase("ja-JP") === trimmedName.toLocaleLowerCase("ja-JP"),
+    );
+
+    if (existingTag) {
+      setSelectedTagIds((current) => (current.includes(existingTag.id) ? current : [...current, existingTag.id]));
+      setIsTagCreateOpen(false);
+      setNewTagName("");
+      setTagCreateMessage(null);
+      return;
+    }
+
+    setIsCreatingTag(true);
+    setTagCreateMessage(null);
+
+    try {
+      const response = await fetch("/api/tags", {
+        body: JSON.stringify({ name: trimmedName }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+
+      const payload = (await response.json()) as {
+        error?: string;
+        tag?: TagRow;
+      };
+
+      if (!response.ok || !payload.tag) {
+        setTagCreateMessage({
+          text: payload.error ?? "Failed to create the tag.",
+          tone: "error",
+        });
+        return;
+      }
+
+      const createdTag = payload.tag;
+
+      setTagOptions((current) => {
+        if (current.some((tag) => tag.id === createdTag.id)) {
+          return current;
+        }
+
+        return sortTagRows([...current, createdTag]);
+      });
+      setSelectedTagIds((current) => (current.includes(createdTag.id) ? current : [...current, createdTag.id]));
+      setIsTagCreateOpen(false);
+      setNewTagName("");
+      setTagCreateMessage(null);
+    } catch {
+      setTagCreateMessage({
+        text: "Failed to create the tag.",
+        tone: "error",
+      });
+    } finally {
+      setIsCreatingTag(false);
+    }
   }
 
   function syncInputFile(file: File) {
@@ -456,17 +547,19 @@ export function ClipForm({
               </p>
             </div>
 
-            {availableTags.length === 0 ? (
+            {tagOptions.length === 0 ? (
               <div className="grid gap-3">
                 <p className="text-sm leading-7 text-[var(--ui-muted)]">No tags available yet.</p>
-                <Link className={buttonStyles({ className: "w-full", variant: "secondary" })} href="/tags">
-                  Open Tags
-                </Link>
+                {allowInlineTagCreate ? null : (
+                  <Link className={buttonStyles({ className: "w-full", variant: "secondary" })} href="/tags">
+                    Open Tags
+                  </Link>
+                )}
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">
-                {availableTags.map((tag) => {
-                  const isChecked = values.tagIds.includes(tag.id);
+                {tagOptions.map((tag) => {
+                  const isChecked = selectedTagIds.includes(tag.id);
                   const backgroundColor = isChecked ? tag.color ?? "var(--tag-neutral-bg)" : "var(--panel-bg)";
                   const textColor = isChecked ? getTagTextColor(tag.color) : "var(--panel-fg)";
 
@@ -478,8 +571,9 @@ export function ClipForm({
                     >
                       <input
                         className="h-4 w-4 accent-[var(--ui-fg)]"
-                        defaultChecked={isChecked}
+                        checked={isChecked}
                         name="tagIds"
+                        onChange={() => toggleTagSelection(tag.id)}
                         type="checkbox"
                         value={tag.id}
                       />
@@ -489,6 +583,54 @@ export function ClipForm({
                 })}
               </div>
             )}
+
+            {allowInlineTagCreate ? (
+              <div className="grid gap-3 border-t-2 border-[var(--ui-border-soft)] pt-4">
+                {isTagCreateOpen ? (
+                  <div className="grid gap-3 border-2 border-[var(--ui-border-soft)] p-4">
+                    <Input
+                      onChange={(event) => setNewTagName(event.target.value)}
+                      placeholder="New tag name"
+                      value={newTagName}
+                    />
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        className={buttonStyles({ size: "small", variant: "secondary" })}
+                        disabled={isCreatingTag}
+                        onClick={handleCreateTag}
+                        type="button"
+                      >
+                        {isCreatingTag ? "Creating..." : "Create Tag"}
+                      </button>
+                      <button
+                        className={buttonStyles({ size: "small", variant: "outline" })}
+                        disabled={isCreatingTag}
+                        onClick={() => {
+                          setIsTagCreateOpen(false);
+                          setNewTagName("");
+                          setTagCreateMessage(null);
+                        }}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {tagCreateMessage ? <FormMessage tone={tagCreateMessage.tone}>{tagCreateMessage.text}</FormMessage> : null}
+                  </div>
+                ) : (
+                  <button
+                    className="w-fit text-sm font-semibold tracking-[0.08em] text-[var(--panel-fg)] underline underline-offset-4"
+                    onClick={() => {
+                      setIsTagCreateOpen(true);
+                      setTagCreateMessage(null);
+                    }}
+                    type="button"
+                  >
+                    + 新しいタグを作成
+                  </button>
+                )}
+              </div>
+            ) : null}
           </div>
         </aside>
       </div>

@@ -178,6 +178,7 @@ It is not a bookmark list. The goal is to save, sort, revisit, and manage readin
 - New clip form
 - Fields: `title`, `image`, `body`, `url`, `memo`
 - Uses a modal-style centered layout with a close action
+- Allows inline tag creation; a newly created tag is added to the local list and auto-selected before the clip is saved
 - Allows assigning existing tags
 - Includes a `Fetch Title` button for URL-based title lookup
 - Includes a `Fetch Content` button for URL-based body extraction
@@ -267,6 +268,8 @@ It is not a bookmark list. The goal is to save, sort, revisit, and manage readin
 - Extracted content is normalized, trimmed, and capped at 18000 characters.
 - Content fetch succeeds only when at least 200 characters of body text are extracted.
 - The form UI distinguishes invalid URL, non-article pages, and blocked fetch failures with separate messages.
+- The clip create and edit forms allow inline tag creation; a newly created tag is created immediately, added to the local tag list, auto-selected for the current clip, and only attached to the clip when the user saves the form.
+- Duplicate tag creation is prevented per user by reusing an existing owned tag with the same trimmed name instead of inserting a second row.
 - AI summary generation uses Gemini on the server side and stores the result in `clips.ai_summary`.
 - If `GEMINI_API_KEY` is missing, detail-page AI summary UI remains visible and shows a clear error message.
 - Gemini model selection is controlled by `GEMINI_MODEL` on the server; default is `gemini-1.5-flash` when unset.
