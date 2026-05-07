@@ -21,7 +21,7 @@ export default function GlobalError({
         <p className="text-xs font-semibold uppercase tracking-[0.24em]">Error</p>
         <h2 className="text-4xl font-black uppercase">Something Broke</h2>
       </div>
-      <p className="text-sm text-black/70">読み込みに失敗しました。再試行しても直らない場合は設定を見直してください。</p>
+      <p className="text-sm text-[var(--ui-muted)]">予期しないエラーが発生しました。再読み込みしても解決しない場合は、時間をおいて再試行してください。</p>
       <div>
         <Button onClick={reset} type="button">
           Retry

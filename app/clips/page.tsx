@@ -23,11 +23,7 @@ export const dynamic = "force-dynamic";
 
 function ClipsFeedback({ error }: { error?: string }) {
   if (error === "bulk_archive") {
-    return (
-      <div className="border-2 border-red-700 bg-red-50 px-4 py-3 text-sm text-red-800">
-        一括アーカイブに失敗しました。もう一度試してください。
-      </div>
-    );
+    return <div className="border-2 border-red-700 bg-red-50 px-4 py-3 text-sm text-red-800">一括アーカイブに失敗しました。もう一度試してください。</div>;
   }
 
   return null;
@@ -46,15 +42,7 @@ export default async function ClipsPage({
     year?: string | string[];
   }>;
 }>) {
-  const {
-    error,
-    month: rawMonth,
-    select: rawSelect,
-    sort: rawSort,
-    tag: rawTag,
-    view: rawView,
-    year: rawYear,
-  } = await searchParams;
+  const { error, month: rawMonth, select: rawSelect, sort: rawSort, tag: rawTag, view: rawView, year: rawYear } = await searchParams;
   const { supabase, user } = await requireUser();
   const sort = resolveClipSort(rawSort);
   const tag = resolveTagFilter(rawTag);
@@ -66,51 +54,15 @@ export default async function ClipsPage({
     listTagsWithUsage(supabase, user.id),
   ]);
 
-  const selectionHref = buildClipBrowseHref("/clips", {
-    month: monthFilter?.month,
-    select: true,
-    sort,
-    tag,
-    view,
-    year: monthFilter?.year,
-  });
-  const browseHref = buildClipBrowseHref("/clips", {
-    month: monthFilter?.month,
-    sort,
-    tag,
-    view,
-    year: monthFilter?.year,
-  });
-  const clearMonthHref = buildClipBrowseHref("/clips", {
-    select: selectionMode,
-    sort,
-    tag,
-    view,
-  });
+  const selectionHref = buildClipBrowseHref("/clips", { month: monthFilter?.month, select: true, sort, tag, view, year: monthFilter?.year });
+  const browseHref = buildClipBrowseHref("/clips", { month: monthFilter?.month, sort, tag, view, year: monthFilter?.year });
+  const clearMonthHref = buildClipBrowseHref("/clips", { select: selectionMode, sort, tag, view });
   const selectionFormId = "clips-bulk-archive-form";
-  const jsonExportHref = buildExportHref({
-    format: "json",
-    month: monthFilter?.month,
-    scope: "clips",
-    sort,
-    tag,
-    year: monthFilter?.year,
-  });
-  const csvExportHref = buildExportHref({
-    format: "csv",
-    month: monthFilter?.month,
-    scope: "clips",
-    sort,
-    tag,
-    year: monthFilter?.year,
-  });
+  const jsonExportHref = buildExportHref({ format: "json", month: monthFilter?.month, scope: "clips", sort, tag, year: monthFilter?.year });
+  const csvExportHref = buildExportHref({ format: "csv", month: monthFilter?.month, scope: "clips", sort, tag, year: monthFilter?.year });
 
-  const monthLabel = monthFilter
-    ? `${monthFilter.year}年${monthFilter.month}月の記事`
-    : "すべての記事";
-  const emptyTitle = monthFilter
-    ? "この月の記事はまだありません"
-    : "まだ記事がありません";
+  const monthLabel = monthFilter ? `${monthFilter.year}年${monthFilter.month}月の記事` : "すべての記事";
+  const emptyTitle = monthFilter ? "この月の記事はまだありません" : "まだ記事がありません";
   const emptyDescription = monthFilter
     ? `${monthFilter.year}年${monthFilter.month}月に作成した記事はまだありません。別の月を選ぶか、新しく記事を作成してください。`
     : "メモやURLから記事を保存して、あとで読むためのアーカイブをここから作成できます。";
@@ -123,49 +75,21 @@ export default async function ClipsPage({
           {monthFilter ? (
             <div className="flex flex-wrap items-center justify-between gap-3 border-2 border-[var(--ui-border-soft)] bg-[var(--tag-neutral-bg)] px-4 py-3">
               <div className="grid gap-1">
-                <p className="text-[0.68rem] font-semibold tracking-[0.18em] text-[var(--ui-muted)]">
-                  MONTH FILTER
-                </p>
-                <p className="text-sm font-semibold text-[var(--panel-fg)]">
-                  [{monthLabel}]
-                </p>
+                <p className="text-[0.68rem] font-semibold tracking-[0.18em] text-[var(--ui-muted)]">MONTH FILTER</p>
+                <p className="text-sm font-semibold text-[var(--panel-fg)]">[{monthLabel}]</p>
               </div>
-              <Link
-                className={buttonStyles({ size: "small", variant: "outline" })}
-                href={clearMonthHref}
-              >
-                月フィルタを解除
-              </Link>
+              <Link className={buttonStyles({ size: "small", variant: "outline" })} href={clearMonthHref}>月フィルタを解除</Link>
             </div>
           ) : null}
 
-          <TagFilterBar
-            activeTag={tag}
-            basePath="/clips"
-            month={monthFilter?.month}
-            selectionMode={selectionMode}
-            sort={sort}
-            tags={tags}
-            view={view}
-            year={monthFilter?.year}
-          />
+          <TagFilterBar activeTag={tag} basePath="/clips" month={monthFilter?.month} selectionMode={selectionMode} sort={sort} tags={tags} view={view} year={monthFilter?.year} />
 
           {selectionMode ? (
-            <form
-              action={bulkArchiveClipsAction}
-              className="flex flex-wrap items-center gap-4 border-2 border-[var(--ui-border)] p-4"
-              id={selectionFormId}
-            >
+            <form action={bulkArchiveClipsAction} className="flex flex-wrap items-center gap-4 border-2 border-[var(--ui-border)] p-4" id={selectionFormId}>
               <input name="returnTo" type="hidden" value={selectionHref} />
-              <Button type="submit" variant="outline">
-                選択した記事をアーカイブ
-              </Button>
-              <Link className={buttonStyles({ variant: "outline" })} href={browseHref}>
-                キャンセル
-              </Link>
-              <p className="text-sm text-[var(--ui-muted)]">
-                一括でアーカイブしたい記事にチェックを入れてください。
-              </p>
+              <Button type="submit" variant="outline">選択した記事をアーカイブ</Button>
+              <Link className={buttonStyles({ variant: "outline" })} href={browseHref}>キャンセル</Link>
+              <p className="text-sm text-[var(--ui-muted)]">一括でアーカイブしたい記事にチェックを入れてください。</p>
             </form>
           ) : null}
         </>
@@ -187,9 +111,7 @@ export default async function ClipsPage({
           <ExportMenu csvHref={csvExportHref} jsonHref={jsonExportHref} />
           <Link
             className={buttonStyles({
-              className: selectionMode
-                ? "active-control min-h-12 min-w-[96px] px-5 text-sm leading-none"
-                : "min-h-12 min-w-[96px] px-5 text-sm leading-none",
+              className: selectionMode ? "active-control min-h-12 min-w-[96px] px-5 text-sm leading-none" : "min-h-12 min-w-[96px] px-5 text-sm leading-none",
               size: "small",
               variant: "outline",
             })}
@@ -203,13 +125,7 @@ export default async function ClipsPage({
       year={monthFilter?.year}
     >
       {clips.map((clip) => (
-        <ClipCard
-          clip={clip}
-          key={clip.id}
-          selectionFormId={selectionMode ? selectionFormId : undefined}
-          selectionMode={selectionMode}
-          view={view}
-        />
+        <ClipCard clip={clip} key={clip.id} selectionFormId={selectionMode ? selectionFormId : undefined} selectionMode={selectionMode} view={view} />
       ))}
     </ClipBrowser>
   );

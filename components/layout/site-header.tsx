@@ -23,11 +23,11 @@ export async function SiteHeader() {
         </div>
 
         <nav className="flex flex-wrap items-center gap-x-8 gap-y-3 md:justify-start">
-          <HeaderLink href="/clips" label="すべての記事" />
+          <HeaderLink href="/clips" label="一覧" />
           <HeaderLink href="/favorites" label="お気に入り" />
-          <HeaderLink href="/calendar" label="カレンダー" />
           <HeaderLink href="/archive" label="アーカイブ" />
-          <HeaderLink href="/tags" label="タグ管理" />
+          <HeaderLink href="/calendar" label="カレンダー" />
+          <HeaderLink href="/tags" label="タグ" />
         </nav>
 
         <div className="flex flex-wrap items-center gap-5 md:justify-end">
@@ -43,7 +43,7 @@ export async function SiteHeader() {
                 href="/clips/new"
               >
                 <PlusIcon className="h-4 w-4 shrink-0" />
-                <span className="whitespace-nowrap">新規</span>
+                <span className="text-sm leading-none">+ 新規</span>
               </Link>
               <ThemeToggle />
               <form action={logoutAction}>

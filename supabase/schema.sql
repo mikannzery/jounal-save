@@ -38,6 +38,11 @@ create table if not exists public.clip_tags (
 
 create index if not exists clips_user_created_idx on public.clips (user_id, created_at desc);
 create index if not exists clips_user_archived_idx on public.clips (user_id, is_archived, created_at desc);
+create index if not exists clips_user_favorite_idx on public.clips (user_id, is_favorite, is_archived, updated_at desc);
+create index if not exists clip_tags_clip_id_idx on public.clip_tags (clip_id);
+create index if not exists clip_tags_tag_id_idx on public.clip_tags (tag_id);
+create unique index if not exists clip_tags_clip_id_tag_id_idx on public.clip_tags (clip_id, tag_id);
+create unique index if not exists tags_user_lower_name_idx on public.tags (user_id, lower(name));
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -149,8 +154,22 @@ using (
 );
 
 insert into storage.buckets (id, name, public)
-values ('clip-images', 'clip-images', true)
+values ('clip-images', 'clip-images', false)
 on conflict (id) do nothing;
+
+update storage.buckets
+set public = false
+where id = 'clip-images';
+
+drop policy if exists "Users can read own clip images" on storage.objects;
+create policy "Users can read own clip images"
+on storage.objects
+for select
+to authenticated
+using (
+  bucket_id = 'clip-images'
+  and auth.uid()::text = (storage.foldername(name))[1]
+);
 
 drop policy if exists "Users can upload own clip images" on storage.objects;
 create policy "Users can upload own clip images"

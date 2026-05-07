@@ -16,12 +16,12 @@ export type ClipView = "grid" | "list";
 export type ClipMonthFilter = { month: number; year: number };
 
 export const clipSortOptions: Array<{ label: string; value: ClipSort }> = [
-  { label: "作成日新", value: "created_desc" },
-  { label: "作成日古", value: "created_asc" },
-  { label: "更新日新", value: "updated_desc" },
-  { label: "更新日古", value: "updated_asc" },
-  { label: "タイトル昇", value: "title_asc" },
-  { label: "タイトル降", value: "title_desc" },
+  { label: "作成日 新しい順", value: "created_desc" },
+  { label: "作成日 古い順", value: "created_asc" },
+  { label: "更新日 新しい順", value: "updated_desc" },
+  { label: "更新日 古い順", value: "updated_asc" },
+  { label: "タイトル 昇順", value: "title_asc" },
+  { label: "タイトル 降順", value: "title_desc" },
 ];
 
 function applySort<TQuery extends { order: (column: string, options: { ascending: boolean }) => TQuery }>(

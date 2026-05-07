@@ -3,12 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireUser } from "@/lib/auth";
+import { MAX_CLIP_IMAGE_SIZE } from "@/lib/clip-constraints";
 import { getGeminiApiKey, getGeminiModel } from "@/lib/env";
-import { getClipImageBucket } from "@/lib/utils";
+import { appendSearchParam, normalizeInternalRedirectPath } from "@/lib/navigation";
 import { filterOwnedTagIds } from "@/lib/tags";
+import { getClipImageBucket } from "@/lib/utils";
 import type { ActionState } from "@/types/clip";
+import type { Database } from "@/types/database";
 
 const clipSchema = z.object({
   body: z.string().max(20000, "Body must be 20000 characters or less."),
@@ -21,9 +25,11 @@ const clipSchema = z.object({
     .refine((value) => !value || z.url().safeParse(value).success, "Enter a valid URL."),
 });
 
-const maxImageSize = 5 * 1024 * 1024;
 const minimumBodyLengthForSummary = 200;
 const geminiTimeoutMs = 30_000;
+const clipSaveDebugEnabled = process.env.CLIP_SAVE_DEBUG === "1";
+
+type TypedSupabaseClient = SupabaseClient<Database>;
 
 type GeminiGenerateContentResponse = {
   candidates?: Array<{
@@ -53,11 +59,11 @@ function buildSummaryPrompt(body: string) {
   return [
     "以下の本文を日本語で要約してください。",
     "",
-    "要件:",
-    "- 最初に全体の要旨を1〜2文で書く",
+    "条件:",
+    "- 最初に全体の要点を1文で書く",
     "- その後に `- ` 形式の箇条書きを4〜6個書く",
-    "- 各箇条書きは後で読み返して意味が分かる密度で書く",
-    "- 元文にない推測や断定をしない",
+    "- 各箇条書きは、あとで読み返して意味が分かる具体度で書く",
+    "- 本文にない推測や断定をしない",
     "- 感想ではなく内容整理として書く",
     "",
     "本文:",
@@ -116,6 +122,24 @@ function logClipSaveDebug(
   });
 }
 
+function logClipSaveStart(mode: "create" | "update", bucket: string, fileEntry: FormDataEntryValue | null, clipId?: string) {
+  if (!clipSaveDebugEnabled) {
+    return;
+  }
+
+  console.info("[clip-save-debug]", {
+    bucket,
+    ...getImageDebugInfo(fileEntry),
+    clipId: clipId ?? null,
+    mode,
+    stage: "start",
+  });
+}
+
+function revalidateClipLists() {
+  revalidateClipLists();
+}
+
 function parseClipValues(formData: FormData) {
   return clipSchema.safeParse({
     body: String(formData.get("body") ?? ""),
@@ -140,7 +164,7 @@ function validateImageFile(image: File) {
     return "Select an image file only.";
   }
 
-  if (image.size > maxImageSize) {
+  if (image.size > MAX_CLIP_IMAGE_SIZE) {
     return "Image must be 5MB or smaller.";
   }
 
@@ -151,8 +175,7 @@ function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").toLowerCase();
 }
 
-async function uploadClipImage(userId: string, image: File) {
-  const { supabase } = await requireUser();
+async function uploadClipImage(supabase: TypedSupabaseClient, userId: string, image: File) {
   const safeName = sanitizeFileName(image.name || "clip-image");
   const imagePath = `${userId}/${crypto.randomUUID()}-${safeName}`;
   const bucket = getClipImageBucket();
@@ -178,19 +201,17 @@ async function uploadClipImage(userId: string, image: File) {
   };
 }
 
-async function deleteClipImage(imagePath: string | null | undefined) {
+async function deleteClipImage(supabase: TypedSupabaseClient, imagePath: string | null | undefined) {
   if (!imagePath) {
     return;
   }
 
-  const { supabase } = await requireUser();
   const bucket = getClipImageBucket();
   await supabase.storage.from(bucket).remove([imagePath]);
 }
 
-async function replaceClipTags(clipId: string, tagIds: string[]) {
-  const { supabase, user } = await requireUser();
-  const validTagIds = await filterOwnedTagIds(supabase, user.id, [...new Set(tagIds)]);
+async function replaceClipTags(supabase: TypedSupabaseClient, userId: string, clipId: string, tagIds: string[]) {
+  const validTagIds = await filterOwnedTagIds(supabase, userId, [...new Set(tagIds)]);
 
   const { error: deleteError } = await supabase.from("clip_tags").delete().eq("clip_id", clipId);
 
@@ -247,16 +268,11 @@ export async function createClipAction(_: ActionState, formData: FormData): Prom
   let clipId: string | null = null;
   let uploadedImagePath: string | null = null;
 
-  console.info("[clip-save-debug]", {
-    bucket,
-    ...getImageDebugInfo(imageEntry),
-    mode: "create",
-    stage: "start",
-  });
+  logClipSaveStart("create", bucket, imageEntry);
 
   try {
     if (image) {
-      const uploadResult = await uploadClipImage(user.id, image);
+      const uploadResult = await uploadClipImage(supabase, user.id, image);
 
       if (!uploadResult.imagePath) {
         logClipSaveDebug("create:storage-upload-failed", {
@@ -291,7 +307,7 @@ export async function createClipAction(_: ActionState, formData: FormData): Prom
 
     if (error || !data) {
       if (uploadedImagePath) {
-        await deleteClipImage(uploadedImagePath);
+        await deleteClipImage(supabase, uploadedImagePath);
       }
 
       logClipSaveDebug("create:db-insert-failed", {
@@ -307,10 +323,10 @@ export async function createClipAction(_: ActionState, formData: FormData): Prom
     }
 
     clipId = data.id;
-    await replaceClipTags(clipId, tagIds);
+    await replaceClipTags(supabase, user.id, clipId, tagIds);
   } catch (error) {
     if (uploadedImagePath) {
-      await deleteClipImage(uploadedImagePath);
+      await deleteClipImage(supabase, uploadedImagePath);
     }
 
     logClipSaveDebug("create:unexpected-failure", {
@@ -325,9 +341,7 @@ export async function createClipAction(_: ActionState, formData: FormData): Prom
     };
   }
 
-  revalidatePath("/clips");
-  revalidatePath("/favorites");
-  revalidatePath("/archive");
+  revalidateClipLists();
   redirect(`/clips/${clipId}?status=created`);
 }
 
@@ -364,13 +378,7 @@ export async function updateClipAction(clipId: string, _: ActionState, formData:
   let uploadedImagePath: string | null = null;
   let existingImagePath: string | null = null;
 
-  console.info("[clip-save-debug]", {
-    bucket,
-    ...getImageDebugInfo(imageEntry),
-    clipId,
-    mode: "update",
-    stage: "start",
-  });
+  logClipSaveStart("update", bucket, imageEntry, clipId);
 
   try {
     const { data: existingClip, error: existingError } = await supabase
@@ -396,7 +404,7 @@ export async function updateClipAction(clipId: string, _: ActionState, formData:
     existingImagePath = existingClip.image_path;
 
     if (image) {
-      const uploadResult = await uploadClipImage(user.id, image);
+      const uploadResult = await uploadClipImage(supabase, user.id, image);
 
       if (!uploadResult.imagePath) {
         logClipSaveDebug("update:storage-upload-failed", {
@@ -430,7 +438,7 @@ export async function updateClipAction(clipId: string, _: ActionState, formData:
 
     if (error || !data) {
       if (uploadedImagePath) {
-        await deleteClipImage(uploadedImagePath);
+        await deleteClipImage(supabase, uploadedImagePath);
       }
 
       logClipSaveDebug("update:db-update-failed", {
@@ -445,14 +453,14 @@ export async function updateClipAction(clipId: string, _: ActionState, formData:
       };
     }
 
-    await replaceClipTags(clipId, tagIds);
+    await replaceClipTags(supabase, user.id, clipId, tagIds);
 
     if (uploadedImagePath && existingImagePath && existingImagePath !== uploadedImagePath) {
-      await deleteClipImage(existingImagePath);
+      await deleteClipImage(supabase, existingImagePath);
     }
   } catch (error) {
     if (uploadedImagePath) {
-      await deleteClipImage(uploadedImagePath);
+      await deleteClipImage(supabase, uploadedImagePath);
     }
 
     logClipSaveDebug("update:unexpected-failure", {
@@ -467,9 +475,7 @@ export async function updateClipAction(clipId: string, _: ActionState, formData:
     };
   }
 
-  revalidatePath("/clips");
-  revalidatePath("/favorites");
-  revalidatePath("/archive");
+  revalidateClipLists();
   revalidatePath(`/clips/${clipId}`);
   redirect(`/clips/${clipId}?status=updated`);
 }
@@ -498,9 +504,7 @@ export async function archiveClipAction(clipId: string) {
     redirect(`/clips/${clipId}?error=archive`);
   }
 
-  revalidatePath("/clips");
-  revalidatePath("/favorites");
-  revalidatePath("/archive");
+  revalidateClipLists();
   revalidatePath(`/clips/${clipId}`);
   redirect("/archive?status=archived");
 }
@@ -508,10 +512,10 @@ export async function archiveClipAction(clipId: string) {
 export async function bulkArchiveClipsAction(formData: FormData) {
   const { supabase, user } = await requireUser();
   const clipIds = [...new Set(formData.getAll("clipIds").map(String).filter(Boolean))];
-  const returnTo = String(formData.get("returnTo") ?? "/clips");
+  const returnTo = normalizeInternalRedirectPath(String(formData.get("returnTo") ?? "/clips"), "/clips");
 
   if (clipIds.length === 0) {
-    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}error=bulk_archive`);
+    redirect(appendSearchParam(returnTo, "error", "bulk_archive"));
   }
 
   try {
@@ -525,15 +529,13 @@ export async function bulkArchiveClipsAction(formData: FormData) {
       .eq("is_archived", false);
 
     if (error) {
-      redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}error=bulk_archive`);
+      redirect(appendSearchParam(returnTo, "error", "bulk_archive"));
     }
   } catch {
-    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}error=bulk_archive`);
+    redirect(appendSearchParam(returnTo, "error", "bulk_archive"));
   }
 
-  revalidatePath("/clips");
-  revalidatePath("/favorites");
-  revalidatePath("/archive");
+  revalidateClipLists();
   redirect("/archive?status=bulk_archived");
 }
 
@@ -561,9 +563,7 @@ export async function restoreClipAction(clipId: string) {
     redirect("/archive?error=restore");
   }
 
-  revalidatePath("/clips");
-  revalidatePath("/favorites");
-  revalidatePath("/archive");
+  revalidateClipLists();
   redirect("/archive?status=restored");
 }
 
@@ -602,12 +602,10 @@ export async function deleteClipAction(clipId: string) {
   }
 
   if (imagePath) {
-    await deleteClipImage(imagePath);
+    await deleteClipImage(supabase, imagePath);
   }
 
-  revalidatePath("/clips");
-  revalidatePath("/favorites");
-  revalidatePath("/archive");
+  revalidateClipLists();
   redirect("/archive?status=deleted");
 }
 
@@ -630,9 +628,7 @@ export async function setFavoriteClipAction(clipId: string, isFavorite: boolean)
     return;
   }
 
-  revalidatePath("/clips");
-  revalidatePath("/favorites");
-  revalidatePath("/archive");
+  revalidateClipLists();
   revalidatePath(`/clips/${clipId}`);
 }
 

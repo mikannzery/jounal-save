@@ -78,7 +78,7 @@ export default async function CalendarPage({
 
           return (
             <Link
-              aria-label={`${targetYear}年${index + 1}月の記事一覧を表示`}
+              aria-label={`${targetYear}年${index + 1}月の記事一覧を開く`}
               className="group block border-2 border-[var(--ui-border-soft)] p-5 transition-colors hover:border-[var(--ui-border)] hover:bg-[var(--tag-neutral-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ui-fg)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ui-bg)]"
               href={href}
               key={label}

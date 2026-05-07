@@ -1,41 +1,27 @@
-import { buttonStyles } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { createTagAction, deleteTagAction, updateTagAction } from "@/lib/actions/tags";
 import { requireUser } from "@/lib/auth";
 import { listTagsWithUsage } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
 
-function TagFeedback({ error, status }: { error?: string; status?: string }) {
+function TagsFeedback({ error, status }: { error?: string; status?: string }) {
   if (status === "created") {
-    return (
-      <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm text-[var(--panel-fg)]">
-        タグを作成しました。
-      </div>
-    );
+    return <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm">タグを作成しました。</div>;
   }
 
   if (status === "updated") {
-    return (
-      <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm text-[var(--panel-fg)]">
-        タグを更新しました。
-      </div>
-    );
+    return <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm">タグを更新しました。</div>;
   }
 
   if (status === "deleted") {
-    return (
-      <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm text-[var(--panel-fg)]">
-        タグを削除しました。記事は残り、紐付けだけ解除されています。
-      </div>
-    );
+    return <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm">タグを削除しました。</div>;
   }
 
   if (error) {
-    return (
-      <div className="border-2 border-red-700 bg-red-50 px-4 py-3 text-sm text-red-800">
-        タグの更新に失敗しました。
-      </div>
-    );
+    return <div className="border-2 border-red-700 bg-red-50 px-4 py-3 text-sm text-red-800">タグの保存に失敗しました。</div>;
   }
 
   return null;
@@ -51,104 +37,51 @@ export default async function TagsPage({
   const tags = await listTagsWithUsage(supabase, user.id);
 
   return (
-    <section className="border-2 border-[var(--ui-border)] bg-[var(--panel-bg)] text-[var(--panel-fg)]">
-      <div className="grid gap-5 border-b-2 border-[var(--ui-border-soft)] px-5 py-5 md:grid-cols-[1fr_360px] md:px-8 md:py-6">
-        <div className="space-y-2">
-          <p className="text-sm font-semibold tracking-[0.12em] text-[var(--ui-muted)]">
-            [タグ管理]
-          </p>
-          <h1 className="text-[2.7rem] font-bold uppercase leading-none tracking-[0.01em] text-[var(--panel-fg)] md:text-[3.6rem]">
-            TAGS
-          </h1>
-        </div>
-
-        <form action={createTagAction} className="grid gap-3 border-2 border-[var(--ui-border-soft)] p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--panel-fg)]">
-            New Tag
-          </p>
-          <input
-            className="min-h-12 border-2 border-[var(--ui-border)] bg-[var(--panel-bg)] px-3 text-[var(--panel-fg)]"
-            defaultValue="#111111"
-            name="color"
-            type="color"
-          />
-          <input
-            className="min-h-12 border-2 border-[var(--ui-border)] bg-[var(--panel-bg)] px-3 text-sm text-[var(--panel-fg)] placeholder:text-[var(--ui-muted)]"
-            name="name"
-            placeholder="タグ名"
-            required
-          />
-          <button className={buttonStyles({ className: "w-full", variant: "primary" })} type="submit">
-            作成する
-          </button>
-        </form>
+    <section className="grid gap-6 border-2 border-[var(--ui-border)] bg-[var(--panel-bg)] p-5 text-[var(--panel-fg)] md:p-8">
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--ui-muted)]">[タグ管理]</p>
+        <h1 className="text-[3.7rem] font-bold leading-none tracking-[0.01em] md:text-[4.75rem]">TAGS</h1>
       </div>
 
-      <div className="grid gap-5 px-5 py-5 md:px-8 md:py-7">
-        <TagFeedback error={error} status={status} />
+      <TagsFeedback error={error} status={status} />
 
-        {tags.length === 0 ? (
-          <div className="grid gap-4 border-2 border-dashed border-[var(--ui-border-soft)] p-10 text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--ui-muted)]">
-              Empty
-            </p>
-            <p className="text-[2rem] font-bold uppercase text-[var(--panel-fg)]">
-              No Tags Yet
-            </p>
-            <p className="text-sm leading-7 text-[var(--ui-muted)]">
-              最初のタグをここで作成できます。タグを削除しても記事自体は削除されません。
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-4 xl:grid-cols-2">
-            {tags.map((tag) => (
-              <article className="grid gap-4 border-2 border-[var(--ui-border-soft)] p-5" key={tag.id}>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="h-5 w-5 border-2 border-[var(--ui-border)]"
-                      style={{ backgroundColor: tag.color ?? "#111111" }}
-                    />
-                    <p className="text-[1.8rem] font-bold text-[var(--panel-fg)]">
-                      {tag.name}
-                    </p>
-                  </div>
-                  <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--ui-muted)]">
-                    {tag.usageCount} clips
-                  </span>
+      <form action={createTagAction} className="grid gap-4 border-2 border-[var(--ui-border-soft)] p-4 md:grid-cols-[1fr_140px_auto] md:items-end">
+        <Field label="Name">
+          <Input name="name" placeholder="読書" required />
+        </Field>
+        <Field label="Color">
+          <Input defaultValue="#111111" name="color" type="color" />
+        </Field>
+        <Button type="submit" variant="secondary">作成する</Button>
+      </form>
+
+      {tags.length === 0 ? (
+        <div className="border-2 border-dashed border-[var(--ui-border)] p-8 text-center text-sm text-[var(--ui-muted)]">最初のタグを作成すると、ここに表示されます。</div>
+      ) : (
+        <div className="grid gap-4">
+          {tags.map((tag) => (
+            <div className="grid gap-4 border-2 border-[var(--ui-border-soft)] p-4 md:grid-cols-[1fr_auto] md:items-center" key={tag.id}>
+              <div className="flex items-center gap-3">
+                <span className="h-6 w-6 border-2 border-[var(--ui-border)]" style={{ backgroundColor: tag.color ?? "#111111" }} />
+                <div>
+                  <p className="font-semibold">{tag.name}</p>
+                  <p className="text-xs text-[var(--ui-muted)]">{tag.usageCount}件</p>
                 </div>
-
-                <form
-                  action={updateTagAction.bind(null, tag.id)}
-                  className="grid gap-3 md:grid-cols-[120px_minmax(0,1fr)_160px]"
-                >
-                  <input
-                    className="min-h-12 border-2 border-[var(--ui-border)] bg-[var(--panel-bg)] px-2 text-[var(--panel-fg)]"
-                    defaultValue={tag.color ?? "#111111"}
-                    name="color"
-                    type="color"
-                  />
-                  <input
-                    className="min-h-12 border-2 border-[var(--ui-border)] bg-[var(--panel-bg)] px-3 text-sm text-[var(--panel-fg)]"
-                    defaultValue={tag.name}
-                    name="name"
-                    required
-                  />
-                  <button className={buttonStyles({ className: "w-full", variant: "secondary" })} type="submit">
-                    保存
-                  </button>
+              </div>
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <form action={updateTagAction.bind(null, tag.id)} className="flex flex-wrap items-end gap-3">
+                  <Input defaultValue={tag.name} name="name" required />
+                  <Input defaultValue={tag.color ?? "#111111"} name="color" type="color" />
+                  <Button type="submit" variant="outline">保存</Button>
                 </form>
-
                 <form action={deleteTagAction.bind(null, tag.id)}>
-                  <button className={buttonStyles({ className: "w-full", variant: "danger" })} type="submit">
-                    タグを削除
-                  </button>
+                  <Button type="submit" variant="outline">タグを削除</Button>
                 </form>
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

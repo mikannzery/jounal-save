@@ -45,7 +45,7 @@ export function ThemeToggle() {
     window.dispatchEvent(new Event("clip-memo-theme-change"));
   }
 
-  const nextModeLabel = mode === "dark" ? "ライトモードへ切り替え" : "ダークモードへ切り替え";
+  const nextModeLabel = mode === "dark" ? "ライトモードに切り替え" : "ダークモードに切り替え";
 
   return (
     <Button

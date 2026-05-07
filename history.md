@@ -102,3 +102,19 @@
 - Final quality pass: deduplicated export dropdown behavior into one shared component, deduplicated clip JSON/CSV formatting into one shared export helper, aligned `tsconfig.json` with the documented stable `.next/types` policy, and removed the last ESLint image warnings with explicit inline rationale for signed/blob image usage.
 - Added inline tag creation to the clip edit form: the editor can create a new tag without leaving the page, duplicate names now reuse the existing owned tag instead of creating another row, and the newly created or reused tag is immediately selected for the pending clip update.
 - Enabled the same inline tag creation flow on the new clip form so `/clips/new` can create a tag in place, reuse duplicate names safely, and preselect the created tag before the clip is saved.
+
+## 2026-05-07
+
+- Performed a long-term maintenance hardening pass for CLIP MEMO.
+- Repaired mojibake-affected UI copy, sort labels, navigation labels, archive/favorite/tag feedback, card actions, AI summary labels, and Gemini summary prompt text across app source files.
+- Added authenticated access checks to `/api/fetch-title` and `/api/fetch-content`.
+- Hardened server-side URL fetching with http/https-only validation, DNS resolution, private/loopback/link-local IP blocking, response size limits, content-type checks, and timeout handling.
+- Added internal-only redirect normalization for login `next` and bulk archive `returnTo`.
+- Expanded middleware protected routes to include `/favorites`, `/tags`, and `/calendar`.
+- Shared the clip image size limit between client and server code.
+- Reduced repeated auth/client acquisition inside clip image and tag helper functions.
+- Gated normal clip-save debug logs behind `CLIP_SAVE_DEBUG=1` while keeping failure diagnostics.
+- Updated `supabase/schema.sql` to document `clip-images` as private, add own-image select policy, and add long-term indexes / uniqueness constraints.
+- Removed `.next/dev/types/**/*.ts` from `tsconfig.json` includes.
+- Added `npm run check:mojibake` for source-level mojibake regression checks.
+- Rewrote `spec.md` into a clean current specification for the hardened app.

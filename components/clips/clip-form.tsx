@@ -8,6 +8,7 @@ import { Field, FormMessage } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Textarea } from "@/components/ui/textarea";
+import { MAX_CLIP_IMAGE_SIZE } from "@/lib/clip-constraints";
 import { initialActionState } from "@/types/clip";
 import type { ActionState, ClipFormValues, TagRow } from "@/types/clip";
 
@@ -22,8 +23,6 @@ interface ClipFormProps {
   submitLabel: string;
   values: ClipFormValues;
 }
-
-const maxImageSize = 5 * 1024 * 1024;
 
 function getTagTextColor(backgroundColor?: string | null) {
   if (!backgroundColor) {
@@ -249,7 +248,7 @@ export function ClipForm({
       return;
     }
 
-    if (file.size > maxImageSize) {
+    if (file.size > MAX_CLIP_IMAGE_SIZE) {
       setImageState({
         text: "Image must be 5MB or smaller.",
         tone: "error",

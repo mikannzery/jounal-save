@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { normalizeInternalRedirectPath } from "@/lib/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/types/clip";
 
@@ -49,7 +50,7 @@ export async function authenticateAction(_: ActionState, formData: FormData): Pr
       }
 
       revalidatePath("/", "layout");
-      redirectTarget = next || "/clips";
+      redirectTarget = normalizeInternalRedirectPath(next, "/clips");
     }
 
     if (intent === "sign-up") {

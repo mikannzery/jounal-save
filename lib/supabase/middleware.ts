@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv, hasSupabaseEnv } from "@/lib/env";
 import type { Database } from "@/types/database";
 
-const protectedPrefixes = ["/archive", "/clips"];
+const protectedPrefixes = ["/archive", "/calendar", "/clips", "/favorites", "/tags"];
 const guestOnlyPrefixes = ["/login"];
 
 export async function updateSession(request: NextRequest) {
