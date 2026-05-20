@@ -108,3 +108,10 @@ CLIP MEMO は、ログインユーザーが記事本文、URL、メモ、タグ�
 - 編集保存時に対象 clip が 0 件になる可能性がある読み取り・更新は `.maybeSingle()` を使い、0 件時は Error Boundary ではなくフォーム内の安全なエラー文言で返します。
 - clip 保存の Supabase / Storage 失敗は、サーバーログに `message`, `code`, `details`, `hint` を含む構造化情報を残し、ユーザーには秘密や内部詳細を含まない文言だけを返します。
 - tagIds が空の場合は `clip_tags.insert([])` を行わず、image path が null / undefined の場合は Storage 削除や signed URL 生成をスキップします。
+
+## 2026-05-20 additional hardening
+
+- URL title/body fetching must validate the initial URL and every redirect target before reading HTML. Redirects to private, loopback, link-local, unsupported-scheme, or too-many-hop targets are rejected.
+- Clip tag replacement uses owned tag validation and diff-based `clip_tags` updates. Existing tag links must not be deleted before a required insert has succeeded.
+- If clip creation succeeds but tag replacement fails, the partially created clip and uploaded image are cleaned up when possible, and cleanup failures are logged server-side.
+- Generated logs, cookies, TypeScript build info, and temporary pager output are not repository source files and should not be committed.

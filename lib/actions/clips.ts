@@ -122,6 +122,7 @@ function logClipSaveDebug(
   stage: string,
   details: {
     bucket: string;
+    cleanupError?: SupabaseErrorLike | Error | null;
     dbError?: SupabaseErrorLike | null;
     dbErrorMessage?: string | null;
     fileEntry: FormDataEntryValue | null;
@@ -133,6 +134,7 @@ function logClipSaveDebug(
 
   console.error("[clip-save-debug]", {
     bucket: details.bucket,
+    cleanupError: getSupabaseErrorInfo(details.cleanupError),
     dbError: getSupabaseErrorInfo(details.dbError),
     dbErrorMessage: details.dbErrorMessage ?? null,
     fileName: fileInfo.name,
@@ -234,30 +236,91 @@ async function deleteClipImage(supabase: TypedSupabaseClient, imagePath: string 
   }
 
   const bucket = getClipImageBucket();
-  await supabase.storage.from(bucket).remove([imagePath]);
+  const { error } = await supabase.storage.from(bucket).remove([imagePath]);
+
+  if (error) {
+    logClipSaveDebug("storage-delete-failed", {
+      bucket,
+      fileEntry: null,
+      storageError: error,
+      storageErrorMessage: error.message,
+    });
+  }
+}
+
+async function cleanupCreatedClipAfterFailure(
+  supabase: TypedSupabaseClient,
+  userId: string,
+  clipId: string | null,
+  imagePath: string | null,
+) {
+  if (clipId) {
+    const { error } = await supabase.from("clips").delete().eq("id", clipId).eq("user_id", userId);
+
+    if (error) {
+      logClipSaveDebug("create:cleanup-clip-delete-failed", {
+        bucket: getClipImageBucket(),
+        cleanupError: error,
+        dbErrorMessage: error.message,
+        fileEntry: null,
+      });
+    }
+  }
+
+  await deleteClipImage(supabase, imagePath);
 }
 
 async function replaceClipTags(supabase: TypedSupabaseClient, userId: string, clipId: string, tagIds: string[]) {
   const validTagIds = await filterOwnedTagIds(supabase, userId, [...new Set(tagIds)]);
+  const { data: existingClipTags, error: selectError } = await supabase
+    .from("clip_tags")
+    .select("tag_id")
+    .eq("clip_id", clipId);
 
-  const { error: deleteError } = await supabase.from("clip_tags").delete().eq("clip_id", clipId);
-
-  if (deleteError) {
+  if (selectError) {
     throw new Error("Failed to update clip tags.");
   }
 
+  const existingTagIds = existingClipTags.map((clipTag) => clipTag.tag_id);
+  const validTagIdSet = new Set(validTagIds);
+  const existingTagIdSet = new Set(existingTagIds);
+  const tagIdsToInsert = validTagIds.filter((tagId) => !existingTagIdSet.has(tagId));
+  const tagIdsToDelete = existingTagIds.filter((tagId) => !validTagIdSet.has(tagId));
+
+  if (tagIdsToInsert.length > 0) {
+    const { error: insertError } = await supabase.from("clip_tags").insert(
+      tagIdsToInsert.map((tagId) => ({
+        clip_id: clipId,
+        tag_id: tagId,
+      })),
+    );
+
+    if (insertError) {
+      throw new Error("Failed to update clip tags.");
+    }
+  }
+
   if (validTagIds.length === 0) {
+    const { error: deleteError } = await supabase.from("clip_tags").delete().eq("clip_id", clipId);
+
+    if (deleteError) {
+      throw new Error("Failed to update clip tags.");
+    }
+
     return;
   }
 
-  const { error: insertError } = await supabase.from("clip_tags").insert(
-    validTagIds.map((tagId) => ({
-      clip_id: clipId,
-      tag_id: tagId,
-    })),
-  );
+  if (tagIdsToDelete.length === 0) {
+    return;
+  }
 
-  if (insertError) {
+  const { error: deleteError } = await supabase
+    .from("clip_tags")
+    .delete()
+    .eq("clip_id", clipId)
+    .in("tag_id", tagIdsToDelete);
+
+  if (deleteError) {
     throw new Error("Failed to update clip tags.");
   }
 }
@@ -354,9 +417,7 @@ export async function createClipAction(_: ActionState, formData: FormData): Prom
     clipId = data.id;
     await replaceClipTags(supabase, user.id, clipId, tagIds);
   } catch (error) {
-    if (uploadedImagePath) {
-      await deleteClipImage(supabase, uploadedImagePath);
-    }
+    await cleanupCreatedClipAfterFailure(supabase, user.id, clipId, uploadedImagePath);
 
     logClipSaveDebug("create:unexpected-failure", {
       bucket,

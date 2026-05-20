@@ -127,4 +127,8 @@
 - Added structured clip-save diagnostics for Supabase and Storage errors, including `message`, `code`, `details`, and `hint`, while keeping user-facing messages safe.
 - Confirmed existing defenses that empty tag arrays skip `clip_tags.insert([])` and null image paths skip Storage deletion / signed URL generation.
 - Files changed: `lib/actions/clips.ts`, `spec.md`, `history.md`.
-- Verification planned: `npm run lint`, `npm run typecheck -- --incremental false`, and `git diff --check`.
+- Verification performed: `npm run lint`, `npm run typecheck -- --incremental false`, `npm run check:mojibake`, and `git diff --check`.
+- Hardened URL content fetching so redirects are followed manually and every redirect target is revalidated before fetching.
+- Changed clip tag replacement from delete-then-insert to diff-based updates to reduce data-loss risk when tag insertion fails.
+- Added cleanup for partially created clips when create-time tag replacement fails, and logged Storage cleanup failures instead of silently ignoring them.
+- Removed generated logs, cookies, and TypeScript build info from Git tracking, ignored them going forward, and deleted an accidental pager-help scratch file.

@@ -8,6 +8,7 @@ const FETCH_TIMEOUT_MS = 10_000;
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const MIN_CONTENT_LENGTH = 200;
 const MAX_CONTENT_LENGTH = 18000;
+const MAX_REDIRECTS = 5;
 const BOILERPLATE_SELECTORS = ["aside", "dialog", "footer", "form", "nav", "noscript", "script", "style"];
 
 function isPrivateIpv4(address: string) {
@@ -151,21 +152,43 @@ export function extractTitle(html: string) {
 }
 
 export async function fetchPageHtml(url: string) {
-  const safeUrl = await validateFetchUrl(url);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(safeUrl, {
-      headers: {
-        Accept: "text/html,application/xhtml+xml",
-        "User-Agent": FETCH_USER_AGENT,
-      },
-      next: {
-        revalidate: 0,
-      },
-      signal: controller.signal,
-    });
+    let safeUrl = await validateFetchUrl(url);
+    let response: Response | null = null;
+
+    for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
+      response = await fetch(safeUrl, {
+        headers: {
+          Accept: "text/html,application/xhtml+xml",
+          "User-Agent": FETCH_USER_AGENT,
+        },
+        next: {
+          revalidate: 0,
+        },
+        redirect: "manual",
+        signal: controller.signal,
+      });
+
+      if (response.status < 300 || response.status >= 400) {
+        break;
+      }
+
+      const location = response.headers.get("location");
+
+      if (!location) {
+        throw new Error("FETCH_FAILED");
+      }
+
+      safeUrl = await validateFetchUrl(new URL(location, safeUrl).toString());
+      response = null;
+    }
+
+    if (!response) {
+      throw new Error("TOO_MANY_REDIRECTS");
+    }
 
     if (!response.ok) {
       throw new Error("FETCH_FAILED");
