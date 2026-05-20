@@ -118,3 +118,13 @@
 - Removed `.next/dev/types/**/*.ts` from `tsconfig.json` includes.
 - Added `npm run check:mojibake` for source-level mojibake regression checks.
 - Rewrote `spec.md` into a clean current specification for the hardened app.
+
+## 2026-05-20
+
+- Fixed the `/clips/[id]/edit` save-time 500 error caused by `revalidateClipLists()` recursively calling itself until `RangeError: Maximum call stack size exceeded`.
+- Changed clip-list revalidation after create/update/archive/restore/delete/favorite actions to explicitly revalidate `/clips`, `/favorites`, and `/archive`.
+- Hardened edit save handling so missing clips use `.maybeSingle()` and return form-level errors instead of falling through to an Error Boundary.
+- Added structured clip-save diagnostics for Supabase and Storage errors, including `message`, `code`, `details`, and `hint`, while keeping user-facing messages safe.
+- Confirmed existing defenses that empty tag arrays skip `clip_tags.insert([])` and null image paths skip Storage deletion / signed URL generation.
+- Files changed: `lib/actions/clips.ts`, `spec.md`, `history.md`.
+- Verification planned: `npm run lint`, `npm run typecheck -- --incremental false`, and `git diff --check`.

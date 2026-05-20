@@ -30,6 +30,12 @@ const geminiTimeoutMs = 30_000;
 const clipSaveDebugEnabled = process.env.CLIP_SAVE_DEBUG === "1";
 
 type TypedSupabaseClient = SupabaseClient<Database>;
+type SupabaseErrorLike = {
+  code?: string | null;
+  details?: string | null;
+  hint?: string | null;
+  message?: string | null;
+};
 
 type GeminiGenerateContentResponse = {
   candidates?: Array<{
@@ -99,12 +105,27 @@ function getImageDebugInfo(image: FormDataEntryValue | null) {
   };
 }
 
+function getSupabaseErrorInfo(error: SupabaseErrorLike | null | undefined) {
+  if (!error) {
+    return null;
+  }
+
+  return {
+    code: error.code ?? null,
+    details: error.details ?? null,
+    hint: error.hint ?? null,
+    message: error.message ?? null,
+  };
+}
+
 function logClipSaveDebug(
   stage: string,
   details: {
     bucket: string;
+    dbError?: SupabaseErrorLike | null;
     dbErrorMessage?: string | null;
     fileEntry: FormDataEntryValue | null;
+    storageError?: SupabaseErrorLike | null;
     storageErrorMessage?: string | null;
   },
 ) {
@@ -112,12 +133,14 @@ function logClipSaveDebug(
 
   console.error("[clip-save-debug]", {
     bucket: details.bucket,
+    dbError: getSupabaseErrorInfo(details.dbError),
     dbErrorMessage: details.dbErrorMessage ?? null,
     fileName: fileInfo.name,
     fileSize: fileInfo.size,
     fileType: fileInfo.type,
     hasFile: fileInfo.hasFile,
     stage,
+    storageError: getSupabaseErrorInfo(details.storageError),
     storageErrorMessage: details.storageErrorMessage ?? null,
   });
 }
@@ -137,7 +160,9 @@ function logClipSaveStart(mode: "create" | "update", bucket: string, fileEntry: 
 }
 
 function revalidateClipLists() {
-  revalidateClipLists();
+  revalidatePath("/clips");
+  revalidatePath("/favorites");
+  revalidatePath("/archive");
 }
 
 function parseClipValues(formData: FormData) {
@@ -189,6 +214,7 @@ async function uploadClipImage(supabase: TypedSupabaseClient, userId: string, im
   if (error) {
     return {
       bucket,
+      error,
       errorMessage: error.message,
       imagePath: null,
     };
@@ -196,6 +222,7 @@ async function uploadClipImage(supabase: TypedSupabaseClient, userId: string, im
 
   return {
     bucket,
+    error: null,
     errorMessage: null,
     imagePath,
   };
@@ -278,11 +305,12 @@ export async function createClipAction(_: ActionState, formData: FormData): Prom
         logClipSaveDebug("create:storage-upload-failed", {
           bucket: uploadResult.bucket,
           fileEntry: imageEntry,
+          storageError: uploadResult.error,
           storageErrorMessage: uploadResult.errorMessage,
         });
 
         return {
-          message: "Failed to upload the image.",
+          message: "画像のアップロードに失敗しました。時間をおいて再試行してください。",
           status: "error",
         };
       }
@@ -312,12 +340,13 @@ export async function createClipAction(_: ActionState, formData: FormData): Prom
 
       logClipSaveDebug("create:db-insert-failed", {
         bucket,
+        dbError: error,
         dbErrorMessage: error?.message ?? "Insert returned no data.",
         fileEntry: imageEntry,
       });
 
       return {
-        message: "Failed to save the clip.",
+        message: "記事の保存に失敗しました。時間をおいて再試行してください。",
         status: "error",
       };
     }
@@ -336,7 +365,7 @@ export async function createClipAction(_: ActionState, formData: FormData): Prom
     });
 
     return {
-      message: "Failed to save the clip.",
+      message: "記事の保存に失敗しました。時間をおいて再試行してください。",
       status: "error",
     };
   }
@@ -386,17 +415,18 @@ export async function updateClipAction(clipId: string, _: ActionState, formData:
       .select("image_path")
       .eq("id", clipId)
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
     if (existingError || !existingClip) {
       logClipSaveDebug("update:load-existing-failed", {
         bucket,
+        dbError: existingError,
         dbErrorMessage: existingError?.message ?? "Existing clip was not found.",
         fileEntry: imageEntry,
       });
 
       return {
-        message: "Failed to update the clip.",
+        message: "記事を保存できませんでした。記事が見つからないか、権限がありません。",
         status: "error",
       };
     }
@@ -410,11 +440,12 @@ export async function updateClipAction(clipId: string, _: ActionState, formData:
         logClipSaveDebug("update:storage-upload-failed", {
           bucket: uploadResult.bucket,
           fileEntry: imageEntry,
+          storageError: uploadResult.error,
           storageErrorMessage: uploadResult.errorMessage,
         });
 
         return {
-          message: "Failed to upload the image.",
+          message: "画像のアップロードに失敗しました。時間をおいて再試行してください。",
           status: "error",
         };
       }
@@ -434,7 +465,7 @@ export async function updateClipAction(clipId: string, _: ActionState, formData:
       .eq("id", clipId)
       .eq("user_id", user.id)
       .select("id")
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       if (uploadedImagePath) {
@@ -443,12 +474,13 @@ export async function updateClipAction(clipId: string, _: ActionState, formData:
 
       logClipSaveDebug("update:db-update-failed", {
         bucket,
+        dbError: error,
         dbErrorMessage: error?.message ?? "Update returned no data.",
         fileEntry: imageEntry,
       });
 
       return {
-        message: "Failed to update the clip.",
+        message: "記事の保存に失敗しました。時間をおいて再試行してください。",
         status: "error",
       };
     }
@@ -470,7 +502,7 @@ export async function updateClipAction(clipId: string, _: ActionState, formData:
     });
 
     return {
-      message: "Failed to update the clip.",
+      message: "記事の保存に失敗しました。時間をおいて再試行してください。",
       status: "error",
     };
   }

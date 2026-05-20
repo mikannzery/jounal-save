@@ -101,3 +101,10 @@ CLIP MEMO は、ログインユーザーが記事本文、URL、メモ、タグ�
 - 文字化け再発確認は `npm run check:mojibake` で行います。
 - 通常保存時の画像 debug log は `CLIP_SAVE_DEBUG=1` のときだけ出します。失敗時の構造化 error log は残します。
 - `supabase/schema.sql` の Storage private 化は schema 上の仕様です。既存 live DB へ適用する場合は、事前に重複タグや既存 bucket 設定を確認してから実行します。
+
+## 2026-05-20 edit save stability
+
+- `/clips/[id]/edit` の保存成功後は、clip 一覧系の再検証として `/clips`, `/favorites`, `/archive` を明示的に `revalidatePath` します。再検証ヘルパーは自分自身を呼び出してはいけません。
+- 編集保存時に対象 clip が 0 件になる可能性がある読み取り・更新は `.maybeSingle()` を使い、0 件時は Error Boundary ではなくフォーム内の安全なエラー文言で返します。
+- clip 保存の Supabase / Storage 失敗は、サーバーログに `message`, `code`, `details`, `hint` を含む構造化情報を残し、ユーザーには秘密や内部詳細を含まない文言だけを返します。
+- tagIds が空の場合は `clip_tags.insert([])` を行わず、image path が null / undefined の場合は Storage 削除や signed URL 生成をスキップします。
