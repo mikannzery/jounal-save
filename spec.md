@@ -115,3 +115,8 @@ CLIP MEMO は、ログインユーザーが記事本文、URL、メモ、タグ�
 - Clip tag replacement uses owned tag validation and diff-based `clip_tags` updates. Existing tag links must not be deleted before a required insert has succeeded.
 - If clip creation succeeds but tag replacement fails, the partially created clip and uploaded image are cleaned up when possible, and cleanup failures are logged server-side.
 - Generated logs, cookies, TypeScript build info, and temporary pager output are not repository source files and should not be committed.
+
+## 2026-05-20 performance notes
+
+- `/calendar` loads only `created_at` values for the selected year and builds monthly counts from that reduced result set.
+- `supabase/schema.sql` includes indexes for common authenticated clip list filters and sorts: active/archive by `updated_at` and title, plus the existing created/favorite/tag indexes.

@@ -132,3 +132,5 @@
 - Changed clip tag replacement from delete-then-insert to diff-based updates to reduce data-loss risk when tag insertion fails.
 - Added cleanup for partially created clips when create-time tag replacement fails, and logged Storage cleanup failures instead of silently ignoring them.
 - Removed generated logs, cookies, and TypeScript build info from Git tracking, ignored them going forward, and deleted an accidental pager-help scratch file.
+- Improved `/calendar` performance by loading only the selected year's `created_at` values instead of every clip row and every column.
+- Added schema indexes for common `updated_at` and title sorts on active/archive clip lists.

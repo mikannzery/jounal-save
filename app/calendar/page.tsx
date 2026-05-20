@@ -1,9 +1,8 @@
 import Link from "next/link";
 
 import { buttonStyles } from "@/components/ui/button";
-import { buildClipBrowseHref } from "@/lib/clips";
+import { buildClipBrowseHref, listClipMonthCountsForUser } from "@/lib/clips";
 import { requireUser } from "@/lib/auth";
-import { listAllClipsForUser } from "@/lib/clips";
 
 export const dynamic = "force-dynamic";
 
@@ -30,13 +29,7 @@ export default async function CalendarPage({
   const { year } = await searchParams;
   const targetYear = Number(year) || new Date().getFullYear();
   const { supabase, user } = await requireUser();
-  const clips = await listAllClipsForUser(supabase, user.id);
-  const monthlyCounts = Array.from({ length: 12 }, (_, monthIndex) =>
-    clips.filter((clip) => {
-      const clipDate = new Date(clip.created_at);
-      return clipDate.getFullYear() === targetYear && clipDate.getMonth() === monthIndex;
-    }).length,
-  );
+  const monthlyCounts = await listClipMonthCountsForUser(supabase, user.id, targetYear);
 
   return (
     <section className="border-2 border-[var(--ui-border)] bg-[var(--panel-bg)] px-5 py-5 text-[var(--panel-fg)] md:px-8 md:py-6">

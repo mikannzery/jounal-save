@@ -340,21 +340,32 @@ export async function listFavoriteClips(
   return listClipsByScope(supabase, userId, "favorite", sort, tagName, monthFilter);
 }
 
-export async function listAllClipsForUser(
+export async function listClipMonthCountsForUser(
   supabase: TypedSupabaseClient,
   userId: string,
+  year: number,
 ) {
+  const rangeStart = new Date(year, 0, 1).toISOString();
+  const rangeEnd = new Date(year + 1, 0, 1).toISOString();
   const { data, error } = await supabase
     .from("clips")
-    .select("*")
+    .select("created_at")
     .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+    .gte("created_at", rangeStart)
+    .lt("created_at", rangeEnd);
 
   if (error) {
-    throw new Error("Failed to load all clips.");
+    throw new Error("Failed to load clip month counts.");
   }
 
-  return data;
+  const monthlyCounts = Array.from({ length: 12 }, () => 0);
+
+  for (const clip of data) {
+    const monthIndex = new Date(clip.created_at).getMonth();
+    monthlyCounts[monthIndex] += 1;
+  }
+
+  return monthlyCounts;
 }
 
 export async function getClipById(
