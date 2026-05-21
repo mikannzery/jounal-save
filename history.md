@@ -134,3 +134,5 @@
 - Removed generated logs, cookies, and TypeScript build info from Git tracking, ignored them going forward, and deleted an accidental pager-help scratch file.
 - Improved `/calendar` performance by loading only the selected year's `created_at` values instead of every clip row and every column.
 - Added schema indexes for common `updated_at` and title sorts on active/archive clip lists.
+- Fixed the route loading state contrast by replacing hard-coded white/black classes with the shared theme panel and text variables.
+- Removed the duplicate plus sign from the header `新規` button while keeping the leading plus icon.
