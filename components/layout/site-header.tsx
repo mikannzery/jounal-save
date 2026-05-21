@@ -43,7 +43,7 @@ export async function SiteHeader() {
                 href="/clips/new"
               >
                 <PlusIcon className="h-4 w-4 shrink-0" />
-                <span className="text-sm leading-none">+ 新規</span>
+                <span className="text-sm leading-none">新規</span>
               </Link>
               <ThemeToggle />
               <form action={logoutAction}>
