@@ -6,6 +6,9 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   description: "Personal article archive for reading, sorting, and revisiting.",
+  icons: {
+    icon: [{ type: "image/svg+xml", url: "/icon.svg" }],
+  },
   title: "CLIP MEMO",
 };
 

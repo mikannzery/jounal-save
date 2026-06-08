@@ -136,3 +136,4 @@
 - Added schema indexes for common `updated_at` and title sorts on active/archive clip lists.
 - Fixed the route loading state contrast by replacing hard-coded white/black classes with the shared theme panel and text variables.
 - Removed the duplicate plus sign from the header `新規` button while keeping the leading plus icon.
+- Added a monochrome CLIP MEMO SVG site icon and wired it through Next.js metadata.
