@@ -5,6 +5,7 @@ import { ClipCard } from "@/components/clips/clip-card";
 import { ExportMenu } from "@/components/clips/export-menu";
 import { TagFilterBar } from "@/components/clips/tag-filter-bar";
 import { Button, buttonStyles } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/field";
 import { bulkArchiveClipsAction } from "@/lib/actions/clips";
 import { requireUser } from "@/lib/auth";
 import {
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
 
 function ClipsFeedback({ error }: { error?: string }) {
   if (error === "bulk_archive") {
-    return <div className="border-2 border-red-700 bg-red-50 px-4 py-3 text-sm text-red-800">一括アーカイブに失敗しました。もう一度試してください。</div>;
+    return <FormMessage tone="error">一括アーカイブに失敗しました。もう一度試してください。</FormMessage>;
   }
 
   return null;

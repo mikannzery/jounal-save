@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  description: "Personal article archive for reading, sorting, and revisiting.",
+  description: "記事を保存し、整理して、あとで読み返すための個人用アーカイブです。",
   icons: {
     icon: [{ type: "image/svg+xml", url: "/icon.svg" }],
   },

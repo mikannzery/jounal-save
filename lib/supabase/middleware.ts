@@ -6,16 +6,25 @@ import type { Database } from "@/types/database";
 
 const protectedPrefixes = ["/archive", "/calendar", "/clips", "/favorites", "/tags"];
 const guestOnlyPrefixes = ["/login"];
+const noStoreHeaders = {
+  "Cache-Control": "no-store",
+};
+
+function redirectNoStore(url: URL) {
+  return NextResponse.redirect(url, {
+    headers: noStoreHeaders,
+  });
+}
 
 export async function updateSession(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
 
   if (!hasSupabaseEnv()) {
     if (pathname === "/setup") {
       return NextResponse.next();
     }
 
-    return NextResponse.redirect(new URL("/setup", request.url));
+    return redirectNoStore(new URL("/setup", request.url));
   }
 
   let response = NextResponse.next({
@@ -47,12 +56,12 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && isProtectedPath) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+    loginUrl.searchParams.set("next", `${pathname}${search}`);
+    return redirectNoStore(loginUrl);
   }
 
   if (user && (pathname === "/" || isGuestOnlyPath || pathname === "/setup")) {
-    return NextResponse.redirect(new URL("/clips", request.url));
+    return redirectNoStore(new URL("/clips", request.url));
   }
 
   return response;

@@ -20,12 +20,34 @@ export function formatDate(dateString: string) {
 }
 
 export function getDomainLabel(url: string | null) {
-  if (!url) {
+  const safeUrl = getSafeExternalUrl(url);
+
+  if (!safeUrl) {
     return null;
   }
 
   try {
-    return new URL(url).hostname.replace(/^www\./, "");
+    return new URL(safeUrl).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+export function getSafeExternalUrl(url: string | null | undefined) {
+  const trimmedUrl = url?.trim();
+
+  if (!trimmedUrl) {
+    return null;
+  }
+
+  try {
+    const parsedUrl = new URL(trimmedUrl);
+
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return null;
+    }
+
+    return parsedUrl.toString();
   } catch {
     return null;
   }
@@ -33,7 +55,7 @@ export function getDomainLabel(url: string | null) {
 
 export function getExcerpt(text: string | null, maxLength = 120) {
   if (!text) {
-    return "No text saved yet.";
+    return "本文はまだ保存されていません。";
   }
 
   if (text.length <= maxLength) {

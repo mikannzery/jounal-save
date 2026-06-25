@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  getClipById,
   listArchivedClips,
   listClips,
   listFavoriteClips,
@@ -13,14 +14,47 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+const noStoreHeaders = {
+  "Cache-Control": "no-store",
+};
+
+function exportError(message: string, status: number) {
+  return NextResponse.json({ error: message }, { headers: noStoreHeaders, status });
+}
+
 function buildExportFilename(scope: string, format: string) {
   const stamp = new Date().toISOString().slice(0, 10);
   return `clip-memo-${scope}-${stamp}.${format}`;
 }
 
+function sanitizeFilenameBase(value: string, fallback: string) {
+  const sanitized = value
+    .replace(/[\u0000-\u001F\u007F\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^\.+|\.+$/g, "")
+    .slice(0, 80);
+
+  return sanitized || fallback;
+}
+
+function encodeContentDispositionFilename(value: string) {
+  return encodeURIComponent(value).replace(/['()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function buildAttachmentDisposition(filename: string) {
+  const asciiFallback = filename.replace(/[^\x20-\x7E]+/g, "-").replace(/"/g, "-") || "clip-memo-export";
+  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeContentDispositionFilename(filename)}`;
+}
+
+function buildClipExportFilename(title: string, format: string) {
+  return `${sanitizeFilenameBase(title, "clip")}.${format}`;
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const format = url.searchParams.get("format");
+  const clipId = url.searchParams.get("id");
   const scope = url.searchParams.get("scope");
   const sort = resolveClipSort(url.searchParams.get("sort") ?? undefined);
   const tag = resolveTagFilter(url.searchParams.get("tag") ?? undefined);
@@ -29,8 +63,8 @@ export async function GET(request: Request) {
     url.searchParams.get("month") ?? undefined,
   );
 
-  if ((format !== "json" && format !== "csv") || (scope !== "clips" && scope !== "favorites" && scope !== "archive")) {
-    return NextResponse.json({ error: "Invalid export parameters." }, { status: 400 });
+  if ((format !== "json" && format !== "csv") || (scope !== "clips" && scope !== "favorites" && scope !== "archive" && scope !== "clip")) {
+    return exportError("export の指定が正しくありません。", 400);
   }
 
   const supabase = await createClient();
@@ -40,10 +74,40 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    return exportError("ログインが必要です。", 401);
   }
 
   try {
+    if (scope === "clip") {
+      if (!clipId) {
+        return exportError("export の指定が正しくありません。", 400);
+      }
+
+      const clip = await getClipById(supabase, clipId, user.id);
+
+      if (!clip) {
+        return exportError("記事が見つかりませんでした。", 404);
+      }
+
+      if (format === "json") {
+        return new NextResponse(JSON.stringify(buildClipExportPayload(clip), null, 2), {
+          headers: {
+            ...noStoreHeaders,
+            "Content-Disposition": buildAttachmentDisposition(buildClipExportFilename(clip.title, "json")),
+            "Content-Type": "application/json; charset=utf-8",
+          },
+        });
+      }
+
+      return new NextResponse(`\uFEFF${buildCsv([buildClipExportRow(clip)])}`, {
+        headers: {
+          ...noStoreHeaders,
+          "Content-Disposition": buildAttachmentDisposition(buildClipExportFilename(clip.title, "csv")),
+          "Content-Type": "text/csv; charset=utf-8",
+        },
+      });
+    }
+
     const clips =
       scope === "favorites"
         ? await listFavoriteClips(supabase, user.id, sort, tag, monthFilter)
@@ -70,7 +134,8 @@ export async function GET(request: Request) {
         ),
         {
           headers: {
-            "Content-Disposition": `attachment; filename="${buildExportFilename(scope, "json")}"`,
+            ...noStoreHeaders,
+            "Content-Disposition": buildAttachmentDisposition(buildExportFilename(scope, "json")),
             "Content-Type": "application/json; charset=utf-8",
           },
         },
@@ -81,11 +146,12 @@ export async function GET(request: Request) {
 
     return new NextResponse(`\uFEFF${csv}`, {
       headers: {
-        "Content-Disposition": `attachment; filename="${buildExportFilename(scope, "csv")}"`,
+        ...noStoreHeaders,
+        "Content-Disposition": buildAttachmentDisposition(buildExportFilename(scope, "csv")),
         "Content-Type": "text/csv; charset=utf-8",
       },
     });
   } catch {
-    return NextResponse.json({ error: "Failed to export clips." }, { status: 500 });
+    return exportError("export に失敗しました。時間をおいて再試行してください。", 500);
   }
 }

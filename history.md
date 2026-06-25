@@ -137,3 +137,84 @@
 - Fixed the route loading state contrast by replacing hard-coded white/black classes with the shared theme panel and text variables.
 - Removed the duplicate plus sign from the header `新規` button while keeping the leading plus icon.
 - Added a monochrome CLIP MEMO SVG site icon and wired it through Next.js metadata.
+
+## 2026-06-23
+
+- Started staged implementation from the whole-repo improvement plan, prioritizing secret hygiene and high-impact runtime safety.
+- Removed `.env.local` from Git tracking without reading or deleting the local file. Follow-up decisions remain for secret rotation and any required Git history scrubbing.
+- Added shared safe external URL handling so clip source URLs are saved and rendered only when they use `http` or `https`.
+- Updated clip create/update validation to reject unsafe URL schemes such as `javascript:`, `mailto:`, and `ftp:`.
+- Hardened clip cards, archived clip cards, and clip detail so existing unsafe URL values are not rendered as clickable external links.
+- Changed clip detail loading from `.single()` to `.maybeSingle()`, returning not-found only for 0 rows and throwing on Supabase read errors after structured server logging.
+- Added shared calendar year parsing so `/calendar?year=` rejects non-integer or out-of-range values before date range construction and falls back to the current year.
+- Hardened archive, bulk archive, restore, delete, and favorite actions so zero affected rows are not reported as successful state changes.
+- Changed permanent delete to stop before DB deletion when the archived clip or image path lookup fails.
+- Added a shared confirmation submit button and applied it to permanent clip delete and tag delete so destructive actions can be cancelled before Server Actions run.
+- Made the shared `danger` button variant visually distinct from normal outline controls.
+- Added `focus-visible` rings to shared buttons, inputs, textareas, and header links so keyboard focus is visible on common controls.
+- Updated the local Supabase schema so `clip_tags` insert RLS checks both clip ownership and tag ownership.
+- Did not apply any remote DB migration; live database policy changes remain an explicit blocked decision.
+- Removed internal `image_path` from normal JSON/CSV export output and replaced it with `has_image`.
+- Prevented stale URL title/content fetch responses from overwriting the form after the URL changes or a newer fetch starts.
+- Made tag creation recover from same-user duplicate creation races by reloading the existing owned tag after a database unique violation.
+- Replaced user-facing Supabase auth raw errors with safe generic messages while logging non-secret auth error metadata server-side.
+- Preserved the original query string in protected-route login redirects so filtered pages return to the same view after login.
+- Adjusted the export dropdown ARIA to match its implemented popover behavior instead of declaring unsupported menu semantics.
+- Moved single-clip export behind `/api/export?scope=clip&id=...` so list cards no longer pass full clip export data into the client export button.
+- Added defensive wrapping for long detail titles, body text, memo text, tag chips, and tag filter labels to reduce mobile overflow.
+- Added live-region roles to shared form messages so async success and error updates are announced by assistive technology.
+- Translated primary user-facing copy in auth, setup, error, clip create/edit, URL fetch, image, and tag creation flows into Japanese.
+- Connected direct `Field` helper/error text to inputs with `aria-describedby` and `aria-invalid` while leaving wrapper fields for a later focused pass.
+- Changed shared `Field` markup so direct controls use `htmlFor` labels and compound fields are no longer wrapped inside a single interactive `<label>`.
+- Removed the reintroduced `.next/dev/types/**/*.ts` include from `tsconfig.json` so typecheck depends only on stable Next generated types.
+- Removed stale `step4-quality-summary.json` from Git tracking and ignored it as a local verification artifact.
+- Expanded `npm run check:mojibake` beyond source files so docs, schema, metadata, and SVG files are included while local generated artifacts remain ignored.
+- Hardened export attachment filenames by stripping control characters, limiting clip-title-derived names, and returning UTF-8 filenames through `filename*`.
+- Replaced the remaining user-facing English export API error messages with safe Japanese messages.
+- Stopped reflecting Gemini raw API error messages to users during AI summary generation and logged minimal server-side failure metadata instead.
+- Changed AI summary clip loading from `.single()` to `.maybeSingle()` so missing clips and database errors are handled separately.
+- Strengthened uploaded image filename normalization so Storage paths use a bounded, non-empty, ASCII-safe filename suffix.
+- Added structured server logs for Supabase failures during clip tag replacement while keeping user-facing save errors generic.
+- Added CSV formula-injection protection so exported spreadsheet cells that could be interpreted as formulas are emitted as literal strings.
+- Added structured server logs for Supabase failures in tag list, usage, ownership validation, and creation helpers.
+- Added structured server logs for Supabase failures in clip list/detail data helpers, including tag resolution and calendar month counts.
+- Hardened URL fetching against IPv4-mapped IPv6 private, loopback, and link-local address forms.
+- Expanded URL fetching SSRF defenses to reject additional special-purpose IPv4 ranges that are not valid external article targets.
+- Added safe failure-code logging for URL title/body fetch operations without logging full requested URLs.
+- Validated the signup email redirect origin before passing it to Supabase, falling back to the local origin when the header is not an `http` or `https` origin.
+- Made auth callback failures explicit by redirecting missing or failed exchange codes back to login and logging non-secret callback error metadata.
+- Translated the remaining English explanatory copy on the login page side panel into Japanese.
+- Added explicit `noopener` to external source URL links while preserving the existing safe URL checks and `noreferrer`.
+- Translated the empty excerpt fallback text into Japanese.
+- Translated the not-found page headings into Japanese.
+- Translated the tag creation form labels into Japanese.
+- Translated the root metadata description into Japanese.
+- Translated export dropdown accessible trigger labels into Japanese while keeping the visible export styling unchanged.
+- Added accessible names to tag inline edit inputs with `aria-label` while preserving the compact edit layout.
+- Displayed a safe login-page error message when auth callback exchange fails and redirects with `error=callback`.
+- Switched tag management create/update/delete feedback to the shared live-region form message component.
+- Changed create clip and create tag insert-return reads from `.single()` to `.maybeSingle()` so zero returned rows follow existing safe failure handling.
+- Added accessible names to the clip image paste region and inline new-tag input without changing the visible form layout.
+- Minimized Global Error Boundary client logging to structured `name`, `message`, and `digest` metadata instead of logging the full Error object.
+- Added explicit `Cache-Control: no-store` headers to export API success and error responses because exports contain personal clip data.
+- Added explicit `Cache-Control: no-store` headers to URL title/body fetch API success and error responses.
+- Minimized inline tag API responses to `id`, `name`, and `color`, and added explicit `Cache-Control: no-store` headers.
+- Hardened tag update/delete actions so zero affected rows are not reported as successful changes.
+- Introduced a UI-facing `TagSummary` type and narrowed tag selects so Client Components receive only `id`, `name`, and `color`.
+- Switched clip detail create/update/archive feedback to the shared live-region form message component.
+- Switched list, favorites, and archive page operation feedback to the shared live-region form message component.
+- Added clip-title-specific accessible names to selection-mode checkboxes on clip cards.
+- Narrowed clip tag relation reads to `clip_id` and `tag_id` instead of selecting the full `clip_tags` row.
+- Added explicit `Cache-Control: no-store` headers to auth callback success and failure redirects.
+- Added optional `SITE_URL` support for signup email callback origins while keeping request Origin validation and local fallback behavior.
+- Documented optional `SITE_URL` on the setup screen so production signup callback configuration is visible.
+- Added explicit `Cache-Control: no-store` headers to middleware auth and setup redirects.
+- Added status semantics to the route loading UI with `role="status"`, `aria-live`, and `aria-busy`.
+- Replaced the shared archive button fallback labels with Japanese text.
+- Replaced the remaining fixed English eyebrow label in the clip form with Japanese copy.
+- Replaced the visible route loading label with Japanese copy.
+- Replaced export dropdown item labels with Japanese copy while keeping JSON/CSV formats unchanged.
+- Removed dialog popup semantics from the export dropdown trigger and linked the open popover with `aria-controls` instead.
+- Verification performed: `npm run lint`, `npm run typecheck -- --incremental false`, `npm run check:mojibake`, and `git diff --check`.
+- Skipped verification: production build, dev server, browser E2E, live Supabase, and live Gemini were not run in this checkpoint sequence.
+- Blocked decisions: rotate any exposed local secrets, decide whether to scrub Git history, decide whether to migrate existing unsafe production URL values, and decide whether to expand Error Boundary messaging or monitoring.

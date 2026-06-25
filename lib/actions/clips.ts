@@ -10,19 +10,19 @@ import { MAX_CLIP_IMAGE_SIZE } from "@/lib/clip-constraints";
 import { getGeminiApiKey, getGeminiModel } from "@/lib/env";
 import { appendSearchParam, normalizeInternalRedirectPath } from "@/lib/navigation";
 import { filterOwnedTagIds } from "@/lib/tags";
-import { getClipImageBucket } from "@/lib/utils";
+import { getClipImageBucket, getSafeExternalUrl } from "@/lib/utils";
 import type { ActionState } from "@/types/clip";
 import type { Database } from "@/types/database";
 
 const clipSchema = z.object({
-  body: z.string().max(20000, "Body must be 20000 characters or less."),
-  memo: z.string().max(4000, "Memo must be 4000 characters or less."),
-  title: z.string().trim().min(1, "Title is required.").max(160, "Title must be 160 characters or less."),
+  body: z.string().max(20000, "本文は20,000文字以内で入力してください。"),
+  memo: z.string().max(4000, "メモは4,000文字以内で入力してください。"),
+  title: z.string().trim().min(1, "タイトルを入力してください。").max(160, "タイトルは160文字以内で入力してください。"),
   url: z
     .string()
     .trim()
-    .max(2000, "URL must be 2000 characters or less.")
-    .refine((value) => !value || z.url().safeParse(value).success, "Enter a valid URL."),
+    .max(2000, "URLは2,000文字以内で入力してください。")
+    .refine((value) => !value || getSafeExternalUrl(value) !== null, "http または https のURLを入力してください。"),
 });
 
 const minimumBodyLengthForSummary = 200;
@@ -161,6 +161,21 @@ function logClipSaveStart(mode: "create" | "update", bucket: string, fileEntry: 
   });
 }
 
+function logAiSummaryError(stage: string, details: { message?: string | null; status?: number | null }) {
+  console.error("[ai-summary-error]", {
+    message: details.message ?? null,
+    stage,
+    status: details.status ?? null,
+  });
+}
+
+function logClipTagReplaceError(stage: string, error: SupabaseErrorLike | null | undefined) {
+  console.error("[clip-tags-error]", {
+    error: getSupabaseErrorInfo(error),
+    stage,
+  });
+}
+
 function revalidateClipLists() {
   revalidatePath("/clips");
   revalidatePath("/favorites");
@@ -188,18 +203,25 @@ function getImageFile(formData: FormData) {
 
 function validateImageFile(image: File) {
   if (!image.type.startsWith("image/")) {
-    return "Select an image file only.";
+    return "画像ファイルを選択してください。";
   }
 
   if (image.size > MAX_CLIP_IMAGE_SIZE) {
-    return "Image must be 5MB or smaller.";
+    return "画像は5MB以下にしてください。";
   }
 
   return null;
 }
 
 function sanitizeFileName(fileName: string) {
-  return fileName.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").toLowerCase();
+  const sanitized = fileName
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[._-]+|[._-]+$/g, "")
+    .slice(0, 80)
+    .toLowerCase();
+
+  return sanitized || "clip-image";
 }
 
 async function uploadClipImage(supabase: TypedSupabaseClient, userId: string, image: File) {
@@ -278,6 +300,7 @@ async function replaceClipTags(supabase: TypedSupabaseClient, userId: string, cl
     .eq("clip_id", clipId);
 
   if (selectError) {
+    logClipTagReplaceError("select-existing", selectError);
     throw new Error("Failed to update clip tags.");
   }
 
@@ -296,6 +319,7 @@ async function replaceClipTags(supabase: TypedSupabaseClient, userId: string, cl
     );
 
     if (insertError) {
+      logClipTagReplaceError("insert-new", insertError);
       throw new Error("Failed to update clip tags.");
     }
   }
@@ -304,6 +328,7 @@ async function replaceClipTags(supabase: TypedSupabaseClient, userId: string, cl
     const { error: deleteError } = await supabase.from("clip_tags").delete().eq("clip_id", clipId);
 
     if (deleteError) {
+      logClipTagReplaceError("delete-all", deleteError);
       throw new Error("Failed to update clip tags.");
     }
 
@@ -321,6 +346,7 @@ async function replaceClipTags(supabase: TypedSupabaseClient, userId: string, cl
     .in("tag_id", tagIdsToDelete);
 
   if (deleteError) {
+    logClipTagReplaceError("delete-removed", deleteError);
     throw new Error("Failed to update clip tags.");
   }
 }
@@ -354,6 +380,7 @@ export async function createClipAction(_: ActionState, formData: FormData): Prom
 
   const { supabase, user } = await requireUser();
   const { body, memo, title, url } = parsed.data;
+  const safeUrl = getSafeExternalUrl(url);
   const tagIds = formData.getAll("tagIds").map(String);
   let clipId: string | null = null;
   let uploadedImagePath: string | null = null;
@@ -390,11 +417,11 @@ export async function createClipAction(_: ActionState, formData: FormData): Prom
         is_favorite: false,
         memo: memo || null,
         title,
-        url: url || null,
+        url: safeUrl,
         user_id: user.id,
       })
       .select("id")
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       if (uploadedImagePath) {
@@ -464,6 +491,7 @@ export async function updateClipAction(clipId: string, _: ActionState, formData:
 
   const { supabase, user } = await requireUser();
   const { body, memo, title, url } = parsed.data;
+  const safeUrl = getSafeExternalUrl(url);
   const tagIds = formData.getAll("tagIds").map(String);
   let uploadedImagePath: string | null = null;
   let existingImagePath: string | null = null;
@@ -521,7 +549,7 @@ export async function updateClipAction(clipId: string, _: ActionState, formData:
         image_path: uploadedImagePath ?? existingImagePath,
         memo: memo || null,
         title,
-        url: url || null,
+        url: safeUrl,
       })
       .eq("id", clipId)
       .eq("user_id", user.id)
@@ -578,15 +606,18 @@ export async function archiveClipAction(clipId: string) {
   let failed = false;
 
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("clips")
       .update({
         is_archived: true,
       })
       .eq("id", clipId)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .eq("is_archived", false)
+      .select("id")
+      .maybeSingle();
 
-    if (error) {
+    if (error || !data) {
       failed = true;
     }
   } catch {
@@ -612,16 +643,17 @@ export async function bulkArchiveClipsAction(formData: FormData) {
   }
 
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("clips")
       .update({
         is_archived: true,
       })
       .in("id", clipIds)
       .eq("user_id", user.id)
-      .eq("is_archived", false);
+      .eq("is_archived", false)
+      .select("id");
 
-    if (error) {
+    if (error || data.length === 0) {
       redirect(appendSearchParam(returnTo, "error", "bulk_archive"));
     }
   } catch {
@@ -637,15 +669,18 @@ export async function restoreClipAction(clipId: string) {
   let failed = false;
 
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("clips")
       .update({
         is_archived: false,
       })
       .eq("id", clipId)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .eq("is_archived", true)
+      .select("id")
+      .maybeSingle();
 
-    if (error) {
+    if (error || !data) {
       failed = true;
     }
   } catch {
@@ -666,7 +701,7 @@ export async function deleteClipAction(clipId: string) {
   let imagePath: string | null = null;
 
   try {
-    const { data: existingClip } = await supabase
+    const { data: existingClip, error: existingClipError } = await supabase
       .from("clips")
       .select("image_path")
       .eq("id", clipId)
@@ -674,17 +709,25 @@ export async function deleteClipAction(clipId: string) {
       .eq("is_archived", true)
       .maybeSingle();
 
+    if (existingClipError || !existingClip) {
+      failed = true;
+    }
+
     imagePath = existingClip?.image_path ?? null;
 
-    const { error } = await supabase
-      .from("clips")
-      .delete()
-      .eq("id", clipId)
-      .eq("user_id", user.id)
-      .eq("is_archived", true);
+    if (!failed) {
+      const { data, error } = await supabase
+        .from("clips")
+        .delete()
+        .eq("id", clipId)
+        .eq("user_id", user.id)
+        .eq("is_archived", true)
+        .select("id")
+        .maybeSingle();
 
-    if (error) {
-      failed = true;
+      if (error || !data) {
+        failed = true;
+      }
     }
   } catch {
     failed = true;
@@ -706,15 +749,17 @@ export async function setFavoriteClipAction(clipId: string, isFavorite: boolean)
   const { supabase, user } = await requireUser();
 
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("clips")
       .update({
         is_favorite: isFavorite,
       })
       .eq("id", clipId)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .select("id")
+      .maybeSingle();
 
-    if (error) {
+    if (error || !data) {
       return;
     }
   } catch {
@@ -739,9 +784,21 @@ export async function generateAiSummaryAction(
     .select("body")
     .eq("id", clipId)
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (clipError || !clip) {
+  if (clipError) {
+    logAiSummaryError("load-clip:db-error", {
+      message: clipError.message,
+      status: null,
+    });
+
+    return {
+      message: "AI要約の準備に失敗しました。時間をおいて再試行してください。",
+      status: "error",
+    };
+  }
+
+  if (!clip) {
     return {
       message: "記事が見つかりませんでした。",
       status: "error",
@@ -804,9 +861,13 @@ export async function generateAiSummaryAction(
     const payload = (await response.json().catch(() => null)) as GeminiGenerateContentResponse | null;
 
     if (!response.ok) {
-      const reason = payload?.error?.message;
+      logAiSummaryError("generate:api-error", {
+        message: payload?.error?.message ?? null,
+        status: response.status,
+      });
+
       return {
-        message: reason ? `AI要約の生成に失敗しました: ${reason}` : "AI要約の生成に失敗しました。",
+        message: "AI要約の生成に失敗しました。時間をおいて再試行してください。",
         status: "error",
       };
     }

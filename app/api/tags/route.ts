@@ -11,6 +11,14 @@ const createTagRequestSchema = z.object({
 
 export const dynamic = "force-dynamic";
 
+const noStoreHeaders = {
+  "Cache-Control": "no-store",
+};
+
+function jsonResponse(body: unknown, status = 200) {
+  return NextResponse.json(body, { headers: noStoreHeaders, status });
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -19,7 +27,7 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    return jsonResponse({ error: "ログインが必要です。" }, 401);
   }
 
   let payload: unknown;
@@ -27,26 +35,30 @@ export async function POST(request: Request) {
   try {
     payload = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+    return jsonResponse({ error: "リクエスト内容が正しくありません。" }, 400);
   }
 
   const parsed = createTagRequestSchema.safeParse(payload);
 
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid tag data." },
-      { status: 400 },
+    return jsonResponse(
+      { error: parsed.error.issues[0]?.message ?? "タグ情報が正しくありません。" },
+      400,
     );
   }
 
   try {
     const result = await createOrGetOwnedTag(supabase, user.id, parsed.data);
 
-    return NextResponse.json({
+    return jsonResponse({
       created: result.created,
-      tag: result.tag,
+      tag: {
+        color: result.tag.color,
+        id: result.tag.id,
+        name: result.tag.name,
+      },
     });
   } catch {
-    return NextResponse.json({ error: "Failed to create the tag." }, { status: 500 });
+    return jsonResponse({ error: "タグの作成に失敗しました。" }, 500);
   }
 }

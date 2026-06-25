@@ -7,7 +7,7 @@ export const CLIP_EXPORT_COLUMNS = [
   "domain",
   "memo",
   "body",
-  "image_path",
+  "has_image",
   "created_at",
   "updated_at",
   "tags",
@@ -17,8 +17,12 @@ type ClipExportColumn = (typeof CLIP_EXPORT_COLUMNS)[number];
 
 export type ClipExportRow = Record<ClipExportColumn, string | null>;
 
+function protectCsvFormulaValue(value: string) {
+  return /^[\s]*[=+\-@]/.test(value) ? `'${value}` : value;
+}
+
 export function escapeCsvValue(value: string | null | undefined) {
-  const normalized = value ?? "";
+  const normalized = protectCsvFormulaValue(value ?? "");
   return `"${normalized.replace(/"/g, "\"\"")}"`;
 }
 
@@ -41,7 +45,7 @@ export function buildClipExportRow(clip: ClipWithTags): ClipExportRow {
     body: clip.body,
     created_at: clip.created_at,
     domain: getDomainLabel(clip.url) ?? "",
-    image_path: clip.image_path,
+    has_image: clip.image_path ? "true" : "false",
     memo: clip.memo,
     tags: clip.tags.map((tag) => tag.name).join(" | "),
     title: clip.title,
@@ -56,8 +60,8 @@ export function buildClipExportPayload(clip: ClipWithTags) {
     ai_summary_updated_at: clip.ai_summary_updated_at,
     body: clip.body,
     created_at: clip.created_at,
+    has_image: Boolean(clip.image_path),
     id: clip.id,
-    image_path: clip.image_path,
     is_archived: clip.is_archived,
     is_favorite: clip.is_favorite,
     memo: clip.memo,

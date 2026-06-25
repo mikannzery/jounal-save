@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { extractTitle, fetchPageHtml } from "@/lib/content-extractor";
+import { extractTitle, fetchPageHtml, getContentFetchErrorCode } from "@/lib/content-extractor";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+const noStoreHeaders = {
+  "Cache-Control": "no-store",
+};
+
+function jsonResponse(body: { error: string } | { title: string }, status = 200) {
+  return NextResponse.json(body, { headers: noStoreHeaders, status });
+}
 
 const urlSchema = z.object({
   url: z
@@ -21,7 +29,7 @@ const urlSchema = z.object({
       } catch {
         return false;
       }
-    }, "Enter a valid URL."),
+    }, "有効なURLを入力してください。"),
 });
 
 export async function GET(request: Request) {
@@ -32,7 +40,7 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    return jsonResponse({ error: "ログインが必要です。" }, 401);
   }
 
   const requestUrl = new URL(request.url);
@@ -41,7 +49,7 @@ export async function GET(request: Request) {
   });
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Enter a valid URL." }, { status: 400 });
+    return jsonResponse({ error: "有効なURLを入力してください。" }, 400);
   }
 
   try {
@@ -49,15 +57,22 @@ export async function GET(request: Request) {
     const title = extractTitle(html);
 
     if (!title) {
-      return NextResponse.json({ error: "No title was found on that page." }, { status: 404 });
+      return jsonResponse({ error: "このページからタイトルを取得できませんでした。" }, 404);
     }
 
-    return NextResponse.json({ title });
+    return jsonResponse({ title });
   } catch (error) {
-    if (error instanceof Error && (error.message === "INVALID_URL" || error.message === "BLOCKED_URL")) {
-      return NextResponse.json({ error: "This URL cannot be fetched." }, { status: 400 });
+    const errorCode = getContentFetchErrorCode(error);
+
+    if (errorCode === "INVALID_URL" || errorCode === "BLOCKED_URL") {
+      return jsonResponse({ error: "このURLは取得できません。" }, 400);
     }
 
-    return NextResponse.json({ error: "Failed to fetch the page title." }, { status: 502 });
+    console.error("[url-fetch-error]", {
+      code: errorCode,
+      route: "fetch-title",
+    });
+
+    return jsonResponse({ error: "ページタイトルの取得に失敗しました。" }, 502);
   }
 }

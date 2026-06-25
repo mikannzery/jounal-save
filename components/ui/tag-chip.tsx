@@ -35,7 +35,7 @@ export function TagChip({
   return (
     <span
       className={cn(
-        "inline-flex min-h-7 items-center justify-center border-2 border-[var(--ui-border)] px-2.5 text-[0.72rem] font-bold tracking-[0.08em]",
+        "inline-flex min-h-7 max-w-full items-center justify-center break-words border-2 border-[var(--ui-border)] px-2.5 text-[0.72rem] font-bold tracking-[0.08em] [overflow-wrap:anywhere]",
         hasColor
           ? "border-[var(--ui-border)]"
           : "bg-[var(--tag-neutral-bg)] text-[var(--tag-neutral-fg)]",

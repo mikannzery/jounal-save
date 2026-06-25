@@ -10,11 +10,56 @@ import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/types/clip";
 
 const authSchema = z.object({
-  email: z.email("Enter a valid email address."),
+  email: z.email("有効なメールアドレスを入力してください。"),
   intent: z.enum(["sign-in", "sign-up"]),
   next: z.string().optional(),
-  password: z.string().min(8, "Password must be at least 8 characters."),
+  password: z.string().min(8, "パスワードは8文字以上で入力してください。"),
 });
+
+type AuthErrorLike = {
+  code?: string;
+  message?: string;
+  name?: string;
+  status?: number;
+};
+
+function logAuthError(intent: "sign-in" | "sign-up", error: AuthErrorLike) {
+  console.error("[auth-action-error]", {
+    code: error.code ?? null,
+    intent,
+    message: error.message ?? null,
+    name: error.name ?? null,
+    status: error.status ?? null,
+  });
+}
+
+function resolveAuthCallbackOrigin(origin: string | null) {
+  const configuredSiteUrl = process.env.SITE_URL?.trim();
+
+  if (configuredSiteUrl) {
+    try {
+      const parsedSiteUrl = new URL(configuredSiteUrl);
+
+      if (parsedSiteUrl.protocol === "http:" || parsedSiteUrl.protocol === "https:") {
+        return parsedSiteUrl.origin;
+      }
+    } catch {
+      // Fall back to the request Origin validation below.
+    }
+  }
+
+  try {
+    const parsed = new URL(origin ?? "");
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return "http://localhost:3000";
+    }
+
+    return parsed.origin;
+  } catch {
+    return "http://localhost:3000";
+  }
+}
 
 export async function authenticateAction(_: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = authSchema.safeParse({
@@ -43,8 +88,9 @@ export async function authenticateAction(_: ActionState, formData: FormData): Pr
       });
 
       if (error) {
+        logAuthError(intent, error);
         return {
-          message: error.message,
+          message: "メールアドレスまたはパスワードを確認してください。",
           status: "error",
         };
       }
@@ -55,7 +101,7 @@ export async function authenticateAction(_: ActionState, formData: FormData): Pr
 
     if (intent === "sign-up") {
       const headerStore = await headers();
-      const origin = headerStore.get("origin") ?? "http://localhost:3000";
+      const origin = resolveAuthCallbackOrigin(headerStore.get("origin"));
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -65,8 +111,9 @@ export async function authenticateAction(_: ActionState, formData: FormData): Pr
       });
 
       if (error) {
+        logAuthError(intent, error);
         return {
-          message: error.message,
+          message: "アカウント作成に失敗しました。入力内容を確認して、時間をおいて再試行してください。",
           status: "error",
         };
       }
@@ -78,14 +125,14 @@ export async function authenticateAction(_: ActionState, formData: FormData): Pr
 
       if (!redirectTarget) {
         return {
-          message: "Check your inbox to finish account setup.",
+          message: "アカウント作成を完了するため、メールをご確認ください。",
           status: "success",
         };
       }
     }
   } catch {
     return {
-      message: "Authentication failed. Please try again.",
+      message: "認証に失敗しました。時間をおいて再試行してください。",
       status: "error",
     };
   }

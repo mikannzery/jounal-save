@@ -1,10 +1,20 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { extractContent, fetchPageHtml } from "@/lib/content-extractor";
+import { extractContent, fetchPageHtml, getContentFetchErrorCode } from "@/lib/content-extractor";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+const noStoreHeaders = {
+  "Cache-Control": "no-store",
+};
+
+type FetchContentResponseBody = { error: string } | ReturnType<typeof extractContent>;
+
+function jsonResponse(body: FetchContentResponseBody, status = 200) {
+  return NextResponse.json(body, { headers: noStoreHeaders, status });
+}
 
 const urlSchema = z.object({
   url: z
@@ -21,7 +31,7 @@ const urlSchema = z.object({
       } catch {
         return false;
       }
-    }, "Enter a valid URL."),
+    }, "有効なURLを入力してください。"),
 });
 
 export async function GET(request: Request) {
@@ -32,7 +42,7 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    return jsonResponse({ error: "ログインが必要です。" }, 401);
   }
 
   const requestUrl = new URL(request.url);
@@ -41,23 +51,30 @@ export async function GET(request: Request) {
   });
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Enter a valid URL." }, { status: 400 });
+    return jsonResponse({ error: "有効なURLを入力してください。" }, 400);
   }
 
   try {
     const html = await fetchPageHtml(parsed.data.url);
     const result = extractContent(html, parsed.data.url);
 
-    return NextResponse.json(result);
+    return jsonResponse(result);
   } catch (error) {
-    if (error instanceof Error && error.message === "CONTENT_TOO_SHORT") {
-      return NextResponse.json({ error: "No article body could be extracted from that page." }, { status: 422 });
+    const errorCode = getContentFetchErrorCode(error);
+
+    if (errorCode === "CONTENT_TOO_SHORT") {
+      return jsonResponse({ error: "このページから記事本文を抽出できませんでした。" }, 422);
     }
 
-    if (error instanceof Error && (error.message === "INVALID_URL" || error.message === "BLOCKED_URL")) {
-      return NextResponse.json({ error: "This URL cannot be fetched." }, { status: 400 });
+    if (errorCode === "INVALID_URL" || errorCode === "BLOCKED_URL") {
+      return jsonResponse({ error: "このURLは取得できません。" }, 400);
     }
 
-    return NextResponse.json({ error: "Failed to fetch the page content." }, { status: 502 });
+    console.error("[url-fetch-error]", {
+      code: errorCode,
+      route: "fetch-content",
+    });
+
+    return jsonResponse({ error: "ページ本文の取得に失敗しました。" }, 502);
   }
 }

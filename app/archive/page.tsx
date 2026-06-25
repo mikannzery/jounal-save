@@ -2,6 +2,7 @@ import { ArchivedClipCard } from "@/components/clips/archived-clip-card";
 import { ClipBrowser } from "@/components/clips/clip-browser";
 import { ExportMenu } from "@/components/clips/export-menu";
 import { TagFilterBar } from "@/components/clips/tag-filter-bar";
+import { FormMessage } from "@/components/ui/field";
 import { requireUser } from "@/lib/auth";
 import { buildExportHref, listArchivedClips, resolveClipSort, resolveClipView, resolveTagFilter } from "@/lib/clips";
 import { listTagsWithUsage } from "@/lib/tags";
@@ -10,27 +11,27 @@ export const dynamic = "force-dynamic";
 
 function ArchiveFeedback({ error, status }: { error?: string; status?: string }) {
   if (status === "archived") {
-    return <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm">記事をアーカイブへ移動しました。</div>;
+    return <FormMessage tone="success">記事をアーカイブへ移動しました。</FormMessage>;
   }
 
   if (status === "bulk_archived") {
-    return <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm">選択した記事をアーカイブへ移動しました。</div>;
+    return <FormMessage tone="success">選択した記事をアーカイブへ移動しました。</FormMessage>;
   }
 
   if (status === "restored") {
-    return <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm">記事を一覧へ戻しました。</div>;
+    return <FormMessage tone="success">記事を一覧へ戻しました。</FormMessage>;
   }
 
   if (status === "deleted") {
-    return <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm">記事を完全に削除しました。</div>;
+    return <FormMessage tone="success">記事を完全に削除しました。</FormMessage>;
   }
 
   if (error === "restore") {
-    return <div className="border-2 border-red-700 bg-red-50 px-4 py-3 text-sm text-red-800">記事の復元に失敗しました。</div>;
+    return <FormMessage tone="error">記事の復元に失敗しました。</FormMessage>;
   }
 
   if (error === "delete") {
-    return <div className="border-2 border-red-700 bg-red-50 px-4 py-3 text-sm text-red-800">記事の完全削除に失敗しました。</div>;
+    return <FormMessage tone="error">記事の完全削除に失敗しました。</FormMessage>;
   }
 
   return null;

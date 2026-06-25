@@ -56,16 +56,18 @@ export async function updateTagAction(tagId: string, formData: FormData) {
   const { supabase, user } = await requireUser();
 
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("tags")
       .update({
         color: parsed.data.color,
         name: parsed.data.name,
       })
       .eq("id", tagId)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .select("id")
+      .maybeSingle();
 
-    if (error) {
+    if (error || !data) {
       redirect("/tags?error=update");
     }
   } catch {
@@ -80,9 +82,15 @@ export async function deleteTagAction(tagId: string) {
   const { supabase, user } = await requireUser();
 
   try {
-    const { error } = await supabase.from("tags").delete().eq("id", tagId).eq("user_id", user.id);
+    const { data, error } = await supabase
+      .from("tags")
+      .delete()
+      .eq("id", tagId)
+      .eq("user_id", user.id)
+      .select("id")
+      .maybeSingle();
 
-    if (error) {
+    if (error || !data) {
       redirect("/tags?error=delete");
     }
   } catch {

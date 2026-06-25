@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
+import { Field, FormMessage } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { createTagAction, deleteTagAction, updateTagAction } from "@/lib/actions/tags";
 import { requireUser } from "@/lib/auth";
@@ -9,19 +10,19 @@ export const dynamic = "force-dynamic";
 
 function TagsFeedback({ error, status }: { error?: string; status?: string }) {
   if (status === "created") {
-    return <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm">タグを作成しました。</div>;
+    return <FormMessage tone="success">タグを作成しました。</FormMessage>;
   }
 
   if (status === "updated") {
-    return <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm">タグを更新しました。</div>;
+    return <FormMessage tone="success">タグを更新しました。</FormMessage>;
   }
 
   if (status === "deleted") {
-    return <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm">タグを削除しました。</div>;
+    return <FormMessage tone="success">タグを削除しました。</FormMessage>;
   }
 
   if (error) {
-    return <div className="border-2 border-red-700 bg-red-50 px-4 py-3 text-sm text-red-800">タグの保存に失敗しました。</div>;
+    return <FormMessage tone="error">タグの保存に失敗しました。</FormMessage>;
   }
 
   return null;
@@ -46,10 +47,10 @@ export default async function TagsPage({
       <TagsFeedback error={error} status={status} />
 
       <form action={createTagAction} className="grid gap-4 border-2 border-[var(--ui-border-soft)] p-4 md:grid-cols-[1fr_140px_auto] md:items-end">
-        <Field label="Name">
+        <Field label="タグ名">
           <Input name="name" placeholder="読書" required />
         </Field>
-        <Field label="Color">
+        <Field label="色">
           <Input defaultValue="#111111" name="color" type="color" />
         </Field>
         <Button type="submit" variant="secondary">作成する</Button>
@@ -70,12 +71,16 @@ export default async function TagsPage({
               </div>
               <div className="grid gap-3 md:grid-cols-[1fr_auto]">
                 <form action={updateTagAction.bind(null, tag.id)} className="flex flex-wrap items-end gap-3">
-                  <Input defaultValue={tag.name} name="name" required />
-                  <Input defaultValue={tag.color ?? "#111111"} name="color" type="color" />
+                  <Input aria-label="タグ名" defaultValue={tag.name} name="name" required />
+                  <Input aria-label="タグの色" defaultValue={tag.color ?? "#111111"} name="color" type="color" />
                   <Button type="submit" variant="outline">保存</Button>
                 </form>
                 <form action={deleteTagAction.bind(null, tag.id)}>
-                  <Button type="submit" variant="outline">タグを削除</Button>
+                  <ConfirmSubmitButton
+                    confirmMessage={`「${tag.name}」タグを削除します。現在 ${tag.usageCount} 件の記事で使われています。削除しますか？`}
+                    idleLabel="タグを削除"
+                    pendingLabel="削除中..."
+                  />
                 </form>
               </div>
             </div>

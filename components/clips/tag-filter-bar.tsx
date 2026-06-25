@@ -53,7 +53,7 @@ export function TagFilterBar({
         <Link
           className={buttonStyles({
             className: cn(
-              "min-h-8 gap-2 border-[var(--ui-border-soft)] px-3.5 text-[0.72rem]",
+              "min-h-8 max-w-full gap-2 border-[var(--ui-border-soft)] px-3.5 text-[0.72rem]",
               activeTag === tag.name ? "active-control" : undefined,
             ),
             size: "small",
@@ -73,7 +73,7 @@ export function TagFilterBar({
             className="inline-block h-3.5 w-3.5 border border-[var(--ui-border)]"
             style={{ backgroundColor: tag.color ?? "var(--ui-fg)" }}
           />
-          <span>{tag.name}</span>
+          <span className="min-w-0 break-words [overflow-wrap:anywhere]">{tag.name}</span>
           <span className="opacity-70">{tag.usageCount}</span>
         </Link>
       ))}

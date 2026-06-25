@@ -140,6 +140,12 @@ with check (
     where clips.id = clip_tags.clip_id
       and clips.user_id = auth.uid()
   )
+  and exists (
+    select 1
+    from public.tags
+    where tags.id = clip_tags.tag_id
+      and tags.user_id = auth.uid()
+  )
 );
 
 drop policy if exists "Users can delete own clip tags" on public.clip_tags;

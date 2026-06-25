@@ -19,11 +19,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const baseClasses =
-  "inline-flex items-center justify-center border-2 font-bold tracking-[0.14em] transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-100";
+  "inline-flex items-center justify-center border-2 font-bold tracking-[0.14em] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ui-fg)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ui-bg)] disabled:cursor-not-allowed disabled:opacity-100";
 
 const variantClasses: Record<ButtonVariant, string> = {
   danger:
-    "border-[var(--ui-border)] bg-[var(--button-bg)] text-[var(--button-fg)] hover:bg-[var(--button-hover-bg)] hover:text-[var(--button-hover-fg)] disabled:border-[var(--button-disabled-border)] disabled:bg-[var(--button-disabled-bg)] disabled:text-[var(--button-disabled-fg)]",
+    "border-red-700 bg-red-700 text-white hover:border-red-800 hover:bg-red-800 hover:text-white disabled:border-[var(--button-disabled-border)] disabled:bg-[var(--button-disabled-bg)] disabled:text-[var(--button-disabled-fg)]",
   filled:
     "border-[var(--ui-fg)] bg-[var(--ui-fg)] text-[var(--ui-bg)] hover:opacity-80 disabled:border-[var(--button-disabled-border)] disabled:bg-[var(--button-disabled-bg)] disabled:text-[var(--button-disabled-fg)]",
   ghost:

@@ -16,7 +16,7 @@ export default async function NewClipPage() {
           cancelHref="/clips"
         description="手入力メモ、URL取得、画像アップロードや貼り付けを使って記事を保存できます。"
         heading="NEW CLIP"
-        submitLabel="Save Clip"
+        submitLabel="保存する"
         values={{
           body: "",
           image_path: "",

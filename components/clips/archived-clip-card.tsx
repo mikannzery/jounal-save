@@ -2,9 +2,10 @@ import Link from "next/link";
 
 import { ArchiveButton } from "@/components/clips/archive-button";
 import { TagChip } from "@/components/ui/tag-chip";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { deleteClipAction, restoreClipAction } from "@/lib/actions/clips";
 import type { ClipWithTags } from "@/types/clip";
-import { cn, formatDate, getDomainLabel, getExcerpt } from "@/lib/utils";
+import { cn, formatDate, getDomainLabel, getExcerpt, getSafeExternalUrl } from "@/lib/utils";
 
 const clampTitleStyle = {
   WebkitBoxOrient: "vertical" as const,
@@ -30,6 +31,7 @@ export function ArchivedClipCard({
   const restoreAction = restoreClipAction.bind(null, clip.id);
   const deleteAction = deleteClipAction.bind(null, clip.id);
   const domain = getDomainLabel(clip.url);
+  const safeUrl = getSafeExternalUrl(clip.url);
 
   return (
     <article
@@ -69,8 +71,8 @@ export function ArchivedClipCard({
         <div className="mt-auto grid gap-3 border-t-2 border-[var(--ui-border)] pt-3">
           <div className="flex flex-wrap items-center gap-3 text-xs font-semibold tracking-[0.12em] text-[var(--ui-muted)]">
             <span>{domain ?? "URL未設定"}</span>
-            {clip.url ? (
-              <a className="underline" href={clip.url} rel="noreferrer" target="_blank">
+            {safeUrl ? (
+              <a className="underline" href={safeUrl} rel="noreferrer noopener" target="_blank">
                 元URL
               </a>
             ) : null}
@@ -96,11 +98,11 @@ export function ArchivedClipCard({
           />
         </form>
         <form action={deleteAction}>
-          <ArchiveButton
+          <ConfirmSubmitButton
             className="w-full"
+            confirmMessage={`「${clip.title}」を完全に削除します。元に戻せません。削除しますか？`}
             idleLabel="完全削除"
             pendingLabel="削除中..."
-            variant="filled"
           />
         </form>
       </div>

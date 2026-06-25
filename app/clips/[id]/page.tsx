@@ -5,12 +5,13 @@ import { AiSummarySection } from "@/components/clips/ai-summary-section";
 import { ArchiveButton } from "@/components/clips/archive-button";
 import { FavoriteButton } from "@/components/clips/favorite-button";
 import { buttonStyles } from "@/components/ui/button";
+import { FormMessage } from "@/components/ui/field";
 import { TagChip } from "@/components/ui/tag-chip";
 import { archiveClipAction, generateAiSummaryAction, setFavoriteClipAction } from "@/lib/actions/clips";
 import { requireUser } from "@/lib/auth";
 import { getClipById } from "@/lib/clips";
 import { hasGeminiApiKey } from "@/lib/env";
-import { formatDate, getDomainLabel, getSignedClipImageUrl } from "@/lib/utils";
+import { formatDate, getDomainLabel, getSafeExternalUrl, getSignedClipImageUrl } from "@/lib/utils";
 
 export default async function ClipDetailPage({
   params,
@@ -32,6 +33,7 @@ export default async function ClipDetailPage({
   const favoriteAction = setFavoriteClipAction.bind(null, clip.id, !clip.is_favorite);
   const summaryAction = generateAiSummaryAction.bind(null, clip.id);
   const domain = getDomainLabel(clip.url);
+  const safeUrl = getSafeExternalUrl(clip.url);
   const imageUrl = await getSignedClipImageUrl(supabase, clip.image_path);
   const canGenerateSummary = hasGeminiApiKey();
 
@@ -43,15 +45,15 @@ export default async function ClipDetailPage({
         </Link>
       </div>
 
-      {status === "created" ? <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm text-[var(--ui-fg)]">記事を作成しました。</div> : null}
-      {status === "updated" ? <div className="border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] px-4 py-3 text-sm text-[var(--ui-fg)]">記事を更新しました。</div> : null}
-      {error === "archive" ? <div className="border-2 border-red-700 bg-red-50 px-4 py-3 text-sm text-red-800">記事のアーカイブに失敗しました。</div> : null}
+      {status === "created" ? <FormMessage tone="success">記事を作成しました。</FormMessage> : null}
+      {status === "updated" ? <FormMessage tone="success">記事を更新しました。</FormMessage> : null}
+      {error === "archive" ? <FormMessage tone="error">記事のアーカイブに失敗しました。</FormMessage> : null}
 
       <article className="grid gap-8 border-2 border-[var(--ui-border)] bg-[var(--panel-bg)] p-6 text-[var(--panel-fg)] md:p-8">
         <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-start">
           <div className="space-y-4">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--ui-muted)]">{clip.is_archived ? "アーカイブ済み" : "記事詳細"}</p>
-            <h1 className="text-3xl font-black leading-tight text-[var(--panel-fg)] md:text-5xl">{clip.title}</h1>
+            <h1 className="break-words text-3xl font-black leading-tight text-[var(--panel-fg)] [overflow-wrap:anywhere] md:text-5xl">{clip.title}</h1>
             <Link
               className={buttonStyles({ size: "small", variant: "outline" })}
               href={`/clips/${clip.id}/edit`}
@@ -107,10 +109,10 @@ export default async function ClipDetailPage({
         ) : null}
 
         <div className="grid gap-6">
-          {clip.url ? (
+          {safeUrl ? (
             <section className="max-w-5xl space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--ui-muted)]">元URL</p>
-              <a className="break-all text-sm text-[var(--panel-fg)] underline underline-offset-4" href={clip.url} rel="noreferrer" target="_blank">
+              <a className="break-all text-sm text-[var(--panel-fg)] underline underline-offset-4" href={safeUrl} rel="noreferrer noopener" target="_blank">
                 {clip.url}
               </a>
             </section>
@@ -118,7 +120,7 @@ export default async function ClipDetailPage({
 
           <section className="grid max-w-5xl gap-3">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--ui-muted)]">本文</p>
-            <div className="min-h-64 border-2 border-[var(--ui-border)] p-5 whitespace-pre-wrap leading-7 text-[var(--panel-fg)] lg:p-6">
+            <div className="min-h-64 whitespace-pre-wrap break-words border-2 border-[var(--ui-border)] p-5 leading-7 text-[var(--panel-fg)] [overflow-wrap:anywhere] lg:p-6">
               {clip.body || "本文はまだ保存されていません。"}
             </div>
           </section>
@@ -126,7 +128,7 @@ export default async function ClipDetailPage({
           {clip.memo ? (
             <section className="grid max-w-4xl gap-3">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--ui-muted)]">メモ</p>
-              <div className="min-h-32 border-2 border-[var(--ui-border)] p-5 whitespace-pre-wrap leading-7 text-[var(--panel-fg)]">{clip.memo}</div>
+              <div className="min-h-32 whitespace-pre-wrap break-words border-2 border-[var(--ui-border)] p-5 leading-7 text-[var(--panel-fg)] [overflow-wrap:anywhere]">{clip.memo}</div>
             </section>
           ) : (
             <section className="grid max-w-4xl gap-3">

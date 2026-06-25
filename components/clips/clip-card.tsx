@@ -6,7 +6,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { PencilIcon } from "@/components/ui/icons";
 import { TagChip } from "@/components/ui/tag-chip";
 import { setFavoriteClipAction } from "@/lib/actions/clips";
-import { cn, formatDate, getDomainLabel, getExcerpt } from "@/lib/utils";
+import { cn, formatDate, getDomainLabel, getExcerpt, getSafeExternalUrl } from "@/lib/utils";
 import type { ClipWithTags } from "@/types/clip";
 
 const clampTitleStyle = {
@@ -35,6 +35,7 @@ export function ClipCard({
   view?: "grid" | "list";
 }) {
   const domain = getDomainLabel(clip.url);
+  const safeUrl = getSafeExternalUrl(clip.url);
   const chips =
     clip.tags.length > 0
       ? clip.tags
@@ -82,7 +83,7 @@ export function ClipCard({
             >
               <PencilIcon />
             </Link>
-            <ClipExportButton className={iconClassName} clip={clip} />
+            <ClipExportButton className={iconClassName} clipId={clip.id} />
             <form action={favoriteAction}>
               <FavoriteButton active={clip.is_favorite} className={iconClassName} />
             </form>
@@ -92,6 +93,7 @@ export function ClipCard({
         {selectionMode && selectionFormId ? (
           <label className="inline-flex w-fit items-center gap-2 text-xs font-semibold tracking-[0.1em] text-[var(--ui-muted)]">
             <input
+              aria-label={`「${clip.title}」を選択`}
               className="h-4 w-4 accent-[var(--ui-fg)]"
               form={selectionFormId}
               name="clipIds"
@@ -123,8 +125,8 @@ export function ClipCard({
           </p>
           <div className="flex flex-wrap items-center gap-3 text-xs font-semibold tracking-[0.12em] text-[var(--ui-muted)]">
             <span>{domain ?? "URL未設定"}</span>
-            {clip.url ? (
-              <a className="underline" href={clip.url} rel="noreferrer" target="_blank">
+            {safeUrl ? (
+              <a className="underline" href={safeUrl} rel="noreferrer noopener" target="_blank">
                 元URL
               </a>
             ) : null}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { buttonStyles } from "@/components/ui/button";
 
@@ -32,6 +32,7 @@ export function ExportDropdown({
   triggerLabel: string;
 }) {
   const [open, setOpen] = useState(false);
+  const popoverId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -59,8 +60,8 @@ export function ExportDropdown({
   return (
     <div className="relative" ref={rootRef}>
       <button
+        aria-controls={open ? popoverId : undefined}
         aria-expanded={open}
-        aria-haspopup="menu"
         aria-label={triggerLabel}
         className={triggerClassName}
         onClick={() => setOpen((current) => !current)}
@@ -73,7 +74,7 @@ export function ExportDropdown({
       {open ? (
         <div
           className={`absolute right-0 top-[calc(100%+10px)] z-20 grid ${menuWidthClassName} gap-2 border-2 border-[var(--ui-border)] bg-[var(--panel-bg)] p-2`}
-          role="menu"
+          id={popoverId}
         >
           {items.map((item) =>
             "href" in item ? (
@@ -86,7 +87,6 @@ export function ExportDropdown({
                 href={item.href}
                 key={item.key}
                 onClick={() => setOpen(false)}
-                role="menuitem"
               >
                 {item.label}
               </Link>
@@ -102,7 +102,6 @@ export function ExportDropdown({
                   item.onSelect();
                   setOpen(false);
                 }}
-                role="menuitem"
                 type="button"
               >
                 {item.label}

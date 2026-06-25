@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { buttonStyles } from "@/components/ui/button";
-import { buildClipBrowseHref, listClipMonthCountsForUser } from "@/lib/clips";
+import { buildClipBrowseHref, listClipMonthCountsForUser, resolveCalendarYear } from "@/lib/clips";
 import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,7 @@ export default async function CalendarPage({
   searchParams: Promise<{ year?: string }>;
 }>) {
   const { year } = await searchParams;
-  const targetYear = Number(year) || new Date().getFullYear();
+  const targetYear = resolveCalendarYear(year, new Date().getFullYear()) ?? new Date().getFullYear();
   const { supabase, user } = await requireUser();
   const monthlyCounts = await listClipMonthCountsForUser(supabase, user.id, targetYear);
 

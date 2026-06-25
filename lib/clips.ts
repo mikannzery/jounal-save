@@ -1,9 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { ClipRow, ClipTagRow, ClipWithTags, TagRow } from "@/types/clip";
+import type { ClipRow, ClipTagSummary, ClipWithTags, TagSummary } from "@/types/clip";
 import type { Database } from "@/types/database";
 
 type TypedSupabaseClient = SupabaseClient<Database>;
+type SupabaseErrorLike = {
+  code?: string | null;
+  details?: string | null;
+  hint?: string | null;
+  message?: string | null;
+};
 
 export type ClipSort =
   | "created_desc"
@@ -15,6 +21,9 @@ export type ClipSort =
 export type ClipView = "grid" | "list";
 export type ClipMonthFilter = { month: number; year: number };
 
+const minClipArchiveYear = 2000;
+const maxClipArchiveYear = 9999;
+
 export const clipSortOptions: Array<{ label: string; value: ClipSort }> = [
   { label: "作成日 新しい順", value: "created_desc" },
   { label: "作成日 古い順", value: "created_asc" },
@@ -23,6 +32,20 @@ export const clipSortOptions: Array<{ label: string; value: ClipSort }> = [
   { label: "タイトル 昇順", value: "title_asc" },
   { label: "タイトル 降順", value: "title_desc" },
 ];
+
+function logClipDataError(stage: string, error: SupabaseErrorLike | null | undefined) {
+  console.error("[clips-error]", {
+    error: error
+      ? {
+          code: error.code ?? null,
+          details: error.details ?? null,
+          hint: error.hint ?? null,
+          message: error.message ?? null,
+        }
+      : null,
+    stage,
+  });
+}
 
 function applySort<TQuery extends { order: (column: string, options: { ascending: boolean }) => TQuery }>(
   query: TQuery,
@@ -50,15 +73,16 @@ async function listClipTagsForClips(
   clipIds: string[],
 ) {
   if (clipIds.length === 0) {
-    return [] satisfies ClipTagRow[];
+    return [] satisfies ClipTagSummary[];
   }
 
   const { data, error } = await supabase
     .from("clip_tags")
-    .select("*")
+    .select("clip_id,tag_id")
     .in("clip_id", clipIds);
 
   if (error) {
+    logClipDataError("list-clip-tags", error);
     throw new Error("Failed to load clip tags.");
   }
 
@@ -71,16 +95,17 @@ async function listTagsByIds(
   tagIds: string[],
 ) {
   if (tagIds.length === 0) {
-    return [] satisfies TagRow[];
+    return [] satisfies TagSummary[];
   }
 
   const { data, error } = await supabase
     .from("tags")
-    .select("*")
+    .select("id,name,color")
     .eq("user_id", userId)
     .in("id", tagIds);
 
   if (error) {
+    logClipDataError("list-tags-by-ids", error);
     throw new Error("Failed to load tags.");
   }
 
@@ -115,7 +140,7 @@ async function attachTags(
     ...clip,
     tags: (tagIdsByClipId.get(clip.id) ?? [])
       .map((tagId) => tagsById.get(tagId))
-      .filter((tag): tag is TagRow => Boolean(tag)),
+      .filter((tag): tag is TagSummary => Boolean(tag)),
   }));
 }
 
@@ -136,6 +161,7 @@ async function resolveTagClipIds(
     .maybeSingle();
 
   if (tagError) {
+    logClipDataError("resolve-tag-filter:tag", tagError);
     throw new Error("Failed to resolve tag filter.");
   }
 
@@ -149,6 +175,7 @@ async function resolveTagClipIds(
     .eq("tag_id", tag.id);
 
   if (clipTagError) {
+    logClipDataError("resolve-tag-filter:clip-tags", clipTagError);
     throw new Error("Failed to resolve tag filter.");
   }
 
@@ -196,6 +223,7 @@ async function listClipsByScope(
   const { data, error } = await applySort(query, sort);
 
   if (error) {
+    logClipDataError("list-clips", error);
     throw new Error("Failed to load clips.");
   }
 
@@ -232,18 +260,35 @@ export function resolveClipMonthFilter(
   rawYear: string | string[] | undefined,
   rawMonth: string | string[] | undefined,
 ) {
-  const year = Number(Array.isArray(rawYear) ? rawYear[0] : rawYear);
+  const year = resolveCalendarYear(rawYear);
   const month = Number(Array.isArray(rawMonth) ? rawMonth[0] : rawMonth);
 
   if (
-    Number.isInteger(year) &&
+    year !== undefined &&
     Number.isInteger(month) &&
-    year >= 2000 &&
-    year <= 9999 &&
     month >= 1 &&
     month <= 12
   ) {
     return { month, year } satisfies ClipMonthFilter;
+  }
+
+  return undefined;
+}
+
+export function resolveCalendarYear(value: string | string[] | undefined, fallbackYear?: number) {
+  const year = Number(Array.isArray(value) ? value[0] : value);
+
+  if (Number.isInteger(year) && year >= minClipArchiveYear && year <= maxClipArchiveYear) {
+    return year;
+  }
+
+  if (
+    fallbackYear !== undefined &&
+    Number.isInteger(fallbackYear) &&
+    fallbackYear >= minClipArchiveYear &&
+    fallbackYear <= maxClipArchiveYear
+  ) {
+    return fallbackYear;
   }
 
   return undefined;
@@ -355,6 +400,7 @@ export async function listClipMonthCountsForUser(
     .lt("created_at", rangeEnd);
 
   if (error) {
+    logClipDataError("list-month-counts", error);
     throw new Error("Failed to load clip month counts.");
   }
 
@@ -378,9 +424,14 @@ export async function getClipById(
     .select("*")
     .eq("id", clipId)
     .eq("user_id", userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
+    logClipDataError("detail-load", error);
+    throw new Error("Failed to load clip.");
+  }
+
+  if (!data) {
     return null;
   }
 

@@ -10,6 +10,27 @@ const MIN_CONTENT_LENGTH = 200;
 const MAX_CONTENT_LENGTH = 18000;
 const MAX_REDIRECTS = 5;
 const BOILERPLATE_SELECTORS = ["aside", "dialog", "footer", "form", "nav", "noscript", "script", "style"];
+const contentFetchErrorCodes = new Set([
+  "BLOCKED_URL",
+  "CONTENT_TOO_SHORT",
+  "FETCH_FAILED",
+  "INVALID_URL",
+  "RESPONSE_TOO_LARGE",
+  "TOO_MANY_REDIRECTS",
+  "UNSUPPORTED_CONTENT_TYPE",
+]);
+
+export function getContentFetchErrorCode(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "UNKNOWN_ERROR";
+  }
+
+  if (error.name === "AbortError") {
+    return "FETCH_TIMEOUT";
+  }
+
+  return contentFetchErrorCodes.has(error.message) ? error.message : "UNKNOWN_ERROR";
+}
 
 function isPrivateIpv4(address: string) {
   const parts = address.split(".").map((part) => Number.parseInt(part, 10));
@@ -24,15 +45,26 @@ function isPrivateIpv4(address: string) {
     first === 0 ||
     first === 10 ||
     first === 127 ||
+    (first === 100 && second >= 64 && second <= 127) ||
     (first === 169 && second === 254) ||
     (first === 172 && second >= 16 && second <= 31) ||
     (first === 192 && second === 168) ||
+    (first === 192 && second === 0 && parts[2] === 0) ||
+    (first === 192 && second === 0 && parts[2] === 2) ||
+    (first === 198 && (second === 18 || second === 19)) ||
+    (first === 198 && second === 51 && parts[2] === 100) ||
+    (first === 203 && second === 0 && parts[2] === 113) ||
     first >= 224
   );
 }
 
 function isPrivateIpv6(address: string) {
   const normalized = address.toLowerCase();
+  const mappedIpv4 = normalized.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/u)?.[1];
+
+  if (mappedIpv4) {
+    return isPrivateIpv4(mappedIpv4);
+  }
 
   return (
     normalized === "::" ||

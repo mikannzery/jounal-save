@@ -10,11 +10,11 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { Textarea } from "@/components/ui/textarea";
 import { MAX_CLIP_IMAGE_SIZE } from "@/lib/clip-constraints";
 import { initialActionState } from "@/types/clip";
-import type { ActionState, ClipFormValues, TagRow } from "@/types/clip";
+import type { ActionState, ClipFormValues, TagSummary } from "@/types/clip";
 
 interface ClipFormProps {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
-  availableTags: TagRow[];
+  availableTags: TagSummary[];
   allowInlineTagCreate?: boolean;
   cancelHref: string;
   description: string;
@@ -81,6 +81,9 @@ export function ClipForm({
   const [tagCreateMessage, setTagCreateMessage] = useState<{ text: string; tone: "error" | "success" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const latestUrlRef = useRef(values.url);
+  const titleFetchIdRef = useRef(0);
+  const contentFetchIdRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -100,7 +103,7 @@ export function ClipForm({
       return true;
     }
 
-    const shouldReplace = window.confirm("A title is already filled in. Replace it with the fetched title?");
+    const shouldReplace = window.confirm("タイトルがすでに入力されています。取得したタイトルで置き換えますか？");
 
     if (shouldReplace) {
       setTitle(nextTitle);
@@ -120,7 +123,7 @@ export function ClipForm({
       return true;
     }
 
-    const shouldReplace = window.confirm("Body text is already filled in. Replace it with the fetched content?");
+    const shouldReplace = window.confirm("本文がすでに入力されています。取得した本文で置き換えますか？");
 
     if (shouldReplace) {
       setBody(nextBody);
@@ -132,21 +135,31 @@ export function ClipForm({
 
   function getFetchContentErrorMessage(status: number, fallbackMessage?: string) {
     if (status === 400) {
-      return fallbackMessage ?? "Enter a valid URL before fetching content.";
+      return fallbackMessage ?? "本文を取得する前に有効なURLを入力してください。";
     }
 
     if (status === 422) {
-      return "This page does not look like a readable article. Try a direct article URL instead of a homepage or product page.";
+      return "このページは読み取り可能な記事ではない可能性があります。トップページや商品ページではなく、記事ページのURLを試してください。";
     }
 
     if (status === 502) {
-      return "The page could not be fetched. The site may block automated access or require JavaScript.";
+      return "ページを取得できませんでした。サイト側で自動アクセスを制限しているか、JavaScript が必要な可能性があります。";
     }
 
-    return fallbackMessage ?? "Failed to fetch the page content.";
+    return fallbackMessage ?? "ページ本文の取得に失敗しました。";
   }
 
-  function sortTagRows(rows: TagRow[]) {
+  function handleUrlChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const nextUrl = event.target.value;
+    latestUrlRef.current = nextUrl;
+    setUrl(nextUrl);
+  }
+
+  function isStaleFetch(requestUrl: string, requestId: number, currentRequestId: number) {
+    return requestId !== currentRequestId || requestUrl !== latestUrlRef.current.trim();
+  }
+
+  function sortTagRows(rows: TagSummary[]) {
     return [...rows].sort((left, right) => left.name.localeCompare(right.name, "ja"));
   }
 
@@ -163,7 +176,7 @@ export function ClipForm({
 
     if (!trimmedName) {
       setTagCreateMessage({
-        text: "Enter a tag name first.",
+        text: "タグ名を入力してください。",
         tone: "error",
       });
       return;
@@ -195,12 +208,12 @@ export function ClipForm({
 
       const payload = (await response.json()) as {
         error?: string;
-        tag?: TagRow;
+        tag?: TagSummary;
       };
 
       if (!response.ok || !payload.tag) {
         setTagCreateMessage({
-          text: payload.error ?? "Failed to create the tag.",
+          text: payload.error ?? "タグの作成に失敗しました。",
           tone: "error",
         });
         return;
@@ -221,7 +234,7 @@ export function ClipForm({
       setTagCreateMessage(null);
     } catch {
       setTagCreateMessage({
-        text: "Failed to create the tag.",
+        text: "タグの作成に失敗しました。",
         tone: "error",
       });
     } finally {
@@ -242,7 +255,7 @@ export function ClipForm({
   function setImagePreview(file: File) {
     if (!file.type.startsWith("image/")) {
       setImageState({
-        text: "Select an image file only.",
+        text: "画像ファイルを選択してください。",
         tone: "error",
       });
       return;
@@ -250,7 +263,7 @@ export function ClipForm({
 
     if (file.size > MAX_CLIP_IMAGE_SIZE) {
       setImageState({
-        text: "Image must be 5MB or smaller.",
+        text: "画像は5MB以下にしてください。",
         tone: "error",
       });
       return;
@@ -263,9 +276,9 @@ export function ClipForm({
     const nextObjectUrl = URL.createObjectURL(file);
     objectUrlRef.current = nextObjectUrl;
     setImagePreviewUrl(nextObjectUrl);
-    setImageLabel(file.name || "pasted-image");
+    setImageLabel(file.name || "貼り付け画像");
     setImageState({
-      text: "Image ready. It will be uploaded when you save.",
+      text: "画像を選択しました。保存時にアップロードされます。",
       tone: "success",
     });
   }
@@ -301,24 +314,31 @@ export function ClipForm({
   async function handleFetchTitle() {
     if (!url.trim()) {
       setFetchState({
-        text: "Enter a URL before fetching the title.",
+        text: "タイトルを取得する前にURLを入力してください。",
         tone: "error",
       });
       return;
     }
 
+    const requestUrl = url.trim();
+    const requestId = titleFetchIdRef.current + 1;
+    titleFetchIdRef.current = requestId;
     setIsFetchingTitle(true);
     setFetchState(null);
 
     try {
-      const response = await fetch(`/api/fetch-title?url=${encodeURIComponent(url)}`, {
+      const response = await fetch(`/api/fetch-title?url=${encodeURIComponent(requestUrl)}`, {
         method: "GET",
       });
       const payload = (await response.json()) as { error?: string; title?: string };
 
+      if (isStaleFetch(requestUrl, requestId, titleFetchIdRef.current)) {
+        return;
+      }
+
       if (!response.ok || !payload.title) {
         setFetchState({
-          text: payload.error ?? "Failed to fetch the page title.",
+          text: payload.error ?? "ページタイトルの取得に失敗しました。",
           tone: "error",
         });
         return;
@@ -326,33 +346,42 @@ export function ClipForm({
 
       const replaced = applyFetchedTitle(payload.title);
       setFetchState({
-        text: replaced ? "Title fetched successfully." : "Title fetched. Existing title was kept.",
+        text: replaced ? "タイトルを取得しました。" : "タイトルを取得しました。既存のタイトルは保持しました。",
         tone: "success",
       });
     } catch {
+      if (isStaleFetch(requestUrl, requestId, titleFetchIdRef.current)) {
+        return;
+      }
+
       setFetchState({
-        text: "Failed to fetch the page title.",
+        text: "ページタイトルの取得に失敗しました。",
         tone: "error",
       });
     } finally {
-      setIsFetchingTitle(false);
+      if (requestId === titleFetchIdRef.current) {
+        setIsFetchingTitle(false);
+      }
     }
   }
 
   async function handleFetchContent() {
     if (!url.trim()) {
       setFetchState({
-        text: "Enter a URL before fetching the content.",
+        text: "本文を取得する前にURLを入力してください。",
         tone: "error",
       });
       return;
     }
 
+    const requestUrl = url.trim();
+    const requestId = contentFetchIdRef.current + 1;
+    contentFetchIdRef.current = requestId;
     setIsFetchingContent(true);
     setFetchState(null);
 
     try {
-      const response = await fetch(`/api/fetch-content?url=${encodeURIComponent(url)}`, {
+      const response = await fetch(`/api/fetch-content?url=${encodeURIComponent(requestUrl)}`, {
         method: "GET",
       });
       const payload = (await response.json()) as {
@@ -361,6 +390,10 @@ export function ClipForm({
         method?: "fallback" | "readability";
         title?: string;
       };
+
+      if (isStaleFetch(requestUrl, requestId, contentFetchIdRef.current)) {
+        return;
+      }
 
       if (!response.ok || !payload.body) {
         setFetchState({
@@ -375,27 +408,33 @@ export function ClipForm({
       const fragments = [];
 
       if (titleApplied) {
-        fragments.push("title updated");
+        fragments.push("タイトルを更新");
       }
 
       if (bodyApplied) {
-        fragments.push("body updated");
+        fragments.push("本文を更新");
       }
 
       setFetchState({
         text:
           fragments.length > 0
-            ? `Content fetched via ${payload.method}. ${payload.body.length} chars, ${fragments.join(", ")}.`
-            : `Content fetched via ${payload.method}. ${payload.body.length} chars. Existing fields were kept.`,
+            ? `本文を取得しました（${payload.method} / ${payload.body.length}文字 / ${fragments.join("、")}）。`
+            : `本文を取得しました（${payload.method} / ${payload.body.length}文字）。既存の入力は保持しました。`,
         tone: "success",
       });
     } catch {
+      if (isStaleFetch(requestUrl, requestId, contentFetchIdRef.current)) {
+        return;
+      }
+
       setFetchState({
-        text: "Failed to fetch the page content.",
+        text: "ページ本文の取得に失敗しました。",
         tone: "error",
       });
     } finally {
-      setIsFetchingContent(false);
+      if (requestId === contentFetchIdRef.current) {
+        setIsFetchingContent(false);
+      }
     }
   }
 
@@ -406,11 +445,11 @@ export function ClipForm({
     >
       <div className="flex items-start justify-between gap-4 border-b-[3px] border-[var(--ui-border)] bg-[var(--ui-fg)] px-5 py-5 text-[var(--ui-bg)] md:px-8 md:py-6">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em]">[Create Entry]</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em]">[記事入力]</p>
           <h1 className="text-4xl font-black uppercase leading-none md:text-[3.75rem]">{heading}</h1>
         </div>
         <Link className={buttonStyles({ size: "small", variant: "secondary" })} href={cancelHref}>
-          Close
+          閉じる
         </Link>
       </div>
 
@@ -423,22 +462,22 @@ export function ClipForm({
             ) : null}
           </div>
 
-          <Field error={state.fieldErrors?.title?.[0]} label="Title">
+          <Field error={state.fieldErrors?.title?.[0]} label="タイトル">
             <Input
               name="title"
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Article title"
+              placeholder="記事タイトル"
               required
               value={title}
             />
           </Field>
 
-          <Field description="Optional source URL." error={state.fieldErrors?.url?.[0]} label="URL">
+          <Field description="任意の参照元URLです。" error={state.fieldErrors?.url?.[0]} label="URL">
             <div className="grid gap-3">
               <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
                 <Input
                   name="url"
-                  onChange={(event) => setUrl(event.target.value)}
+                  onChange={handleUrlChange}
                   placeholder="https://example.com/article"
                   type="url"
                   value={url}
@@ -449,7 +488,7 @@ export function ClipForm({
                   onClick={handleFetchTitle}
                   type="button"
                 >
-                  {isFetchingTitle ? "Fetching..." : "Fetch Title"}
+                  {isFetchingTitle ? "取得中..." : "タイトル取得"}
                 </button>
                 <button
                   className={buttonStyles({ variant: "secondary" })}
@@ -457,58 +496,64 @@ export function ClipForm({
                   onClick={handleFetchContent}
                   type="button"
                 >
-                  {isFetchingContent ? "Fetching..." : "Fetch Content"}
+                  {isFetchingContent ? "取得中..." : "本文取得"}
                 </button>
               </div>
               <p className="text-xs leading-6 text-[var(--ui-muted)]">
-                Best for direct article pages. Home, product, login, or JavaScript-heavy pages may fail.
+                記事ページのURLに向いています。トップページ、商品ページ、ログインが必要なページ、JavaScript依存のページは取得できない場合があります。
               </p>
               {fetchState ? <FormMessage tone={fetchState.tone}>{fetchState.text}</FormMessage> : null}
             </div>
           </Field>
 
-          <Field description="Plain text for the first version." error={state.fieldErrors?.body?.[0]} label="Body">
+          <Field description="保存する本文です。" error={state.fieldErrors?.body?.[0]} label="本文">
             <Textarea
               className="min-h-72"
               name="body"
               onChange={(event) => setBody(event.target.value)}
-              placeholder="Paste or type the article text here."
+              placeholder="記事本文を貼り付けるか入力してください。"
               value={body}
             />
           </Field>
 
-          <Field description="Private notes for later review." error={state.fieldErrors?.memo?.[0]} label="Memo">
+          <Field description="あとで読み返すための個人メモです。" error={state.fieldErrors?.memo?.[0]} label="メモ">
             <Textarea
               className="min-h-52"
               defaultValue={values.memo}
               name="memo"
-              placeholder="Add your own notes, impressions, or reminders."
+              placeholder="メモ、感想、リマインダーを入力してください。"
             />
           </Field>
         </div>
 
         <aside className="grid gap-6">
           <Field
-            description="Upload one image or paste a copied image into the preview box."
+            description="画像を1枚アップロード、またはプレビュー枠へ貼り付けできます。"
             error={state.fieldErrors?.image?.[0]}
-            label="Image"
+            label="画像"
           >
             <div className="grid gap-4 border-[3px] border-[var(--ui-border)] p-5">
-              <div className="grid gap-3" onPaste={handleImagePaste} tabIndex={0}>
+              <div
+                aria-label="画像の貼り付け領域"
+                className="grid gap-3"
+                onPaste={handleImagePaste}
+                role="group"
+                tabIndex={0}
+              >
                 <div className="space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--panel-fg)]">Preview</p>
-                  <p className="text-2xl font-black uppercase text-[var(--panel-fg)]">Clip Sheet</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--panel-fg)]">プレビュー</p>
+                  <p className="text-2xl font-black uppercase text-[var(--panel-fg)]">画像</p>
                 </div>
 
                 <div className="relative flex min-h-48 items-center justify-center overflow-hidden border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)]">
                   {imagePreviewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img alt="Selected clip thumbnail preview" className="h-full min-h-48 w-full object-cover" src={imagePreviewUrl} />
+                    <img alt="選択した画像のプレビュー" className="h-full min-h-48 w-full object-cover" src={imagePreviewUrl} />
                   ) : (
                     <div className="grid gap-2 px-5 py-8 text-center">
-                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--ui-muted)]">No Image</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--ui-muted)]">画像なし</p>
                       <p className="text-sm leading-7 text-[var(--ui-muted)]">
-                        Upload an image or paste from the clipboard here.
+                        画像をアップロードするか、ここにクリップボードから貼り付けてください。
                       </p>
                     </div>
                   )}
@@ -525,14 +570,14 @@ export function ClipForm({
 
                 <div className="flex flex-wrap gap-3">
                   <button className={buttonStyles({ variant: "secondary" })} onClick={() => fileInputRef.current?.click()} type="button">
-                    Upload Image
+                    画像を選択
                   </button>
                   <span className="text-xs leading-6 text-[var(--ui-muted)]">
-                    Copy an image and paste it while this box is focused.
+                    この枠にフォーカスした状態で画像を貼り付けできます。
                   </span>
                 </div>
 
-                {imageLabel ? <p className="text-xs leading-6 text-[var(--ui-muted)]">Selected: {imageLabel}</p> : null}
+                {imageLabel ? <p className="text-xs leading-6 text-[var(--ui-muted)]">選択中: {imageLabel}</p> : null}
                 {imageState ? <FormMessage tone={imageState.tone}>{imageState.text}</FormMessage> : null}
               </div>
             </div>
@@ -540,18 +585,18 @@ export function ClipForm({
 
           <div className="grid gap-4 border-[3px] border-[var(--ui-border)] p-5">
             <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--panel-fg)]">Tags</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[var(--panel-fg)]">タグ</p>
               <p className="text-sm leading-7 text-[var(--ui-muted)]">
-                Pick the tags that should travel with this clip.
+                この記事に付けるタグを選択してください。
               </p>
             </div>
 
             {tagOptions.length === 0 ? (
               <div className="grid gap-3">
-                <p className="text-sm leading-7 text-[var(--ui-muted)]">No tags available yet.</p>
+                <p className="text-sm leading-7 text-[var(--ui-muted)]">まだタグがありません。</p>
                 {allowInlineTagCreate ? null : (
                   <Link className={buttonStyles({ className: "w-full", variant: "secondary" })} href="/tags">
-                    Open Tags
+                    タグ管理を開く
                   </Link>
                 )}
               </div>
@@ -588,8 +633,9 @@ export function ClipForm({
                 {isTagCreateOpen ? (
                   <div className="grid gap-3 border-2 border-[var(--ui-border-soft)] p-4">
                     <Input
+                      aria-label="新しいタグ名"
                       onChange={(event) => setNewTagName(event.target.value)}
-                      placeholder="New tag name"
+                      placeholder="新しいタグ名"
                       value={newTagName}
                     />
                     <div className="flex flex-wrap gap-3">
@@ -599,7 +645,7 @@ export function ClipForm({
                         onClick={handleCreateTag}
                         type="button"
                       >
-                        {isCreatingTag ? "Creating..." : "Create Tag"}
+                        {isCreatingTag ? "作成中..." : "タグを作成"}
                       </button>
                       <button
                         className={buttonStyles({ size: "small", variant: "outline" })}
@@ -611,7 +657,7 @@ export function ClipForm({
                         }}
                         type="button"
                       >
-                        Cancel
+                        キャンセル
                       </button>
                     </div>
                     {tagCreateMessage ? <FormMessage tone={tagCreateMessage.tone}>{tagCreateMessage.text}</FormMessage> : null}
@@ -636,9 +682,9 @@ export function ClipForm({
 
       <div className="flex flex-col-reverse gap-3 border-t-[3px] border-[var(--ui-border)] px-5 py-5 md:flex-row md:justify-end md:px-8">
         <Link className={buttonStyles({ variant: "secondary" })} href={cancelHref}>
-          Cancel
+          キャンセル
         </Link>
-        <SubmitButton idleLabel={submitLabel} pendingLabel="Saving..." />
+        <SubmitButton idleLabel={submitLabel} pendingLabel="保存中..." />
       </div>
     </form>
   );

@@ -14,8 +14,8 @@ export function ExportMenu({
   return (
     <ExportDropdown
       items={[
-        { href: jsonHref, key: "json", label: "EXPORT JSON" },
-        { href: csvHref, key: "csv", label: "EXPORT CSV" },
+        { href: jsonHref, key: "json", label: "JSONでエクスポート" },
+        { href: csvHref, key: "csv", label: "CSVでエクスポート" },
       ]}
       triggerClassName={buttonStyles({
         className: "min-h-12 min-w-[180px] gap-3 px-5 text-sm leading-none",
@@ -28,7 +28,7 @@ export function ExportMenu({
           <span>EXPORT</span>
         </>
       }
-      triggerLabel="Export"
+      triggerLabel="エクスポート"
     />
   );
 }

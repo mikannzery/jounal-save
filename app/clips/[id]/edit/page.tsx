@@ -36,7 +36,7 @@ export default async function EditClipPage({
         description="本文、URL、メモ、タグを見直して、保存済みの記事を更新できます。"
         heading="EDIT CLIP"
         initialImagePreviewUrl={initialImagePreviewUrl}
-        submitLabel="Update Clip"
+        submitLabel="更新する"
         values={{
           body: clip.body ?? "",
           image_path: clip.image_path ?? "",

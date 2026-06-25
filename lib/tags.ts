@@ -1,16 +1,22 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import type { TagRow } from "@/types/clip";
+import type { TagSummary } from "@/types/clip";
 import type { Database } from "@/types/database";
 
 type TypedSupabaseClient = SupabaseClient<Database>;
+type SupabaseErrorLike = {
+  code?: string | null;
+  details?: string | null;
+  hint?: string | null;
+  message?: string | null;
+};
 
 export const DEFAULT_TAG_COLOR = "#111111";
-export const tagNameSchema = z.string().trim().min(1, "Tag name is required.").max(40, "Tag name must be 40 characters or less.");
-export const tagColorSchema = z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, "Choose a valid color.");
+export const tagNameSchema = z.string().trim().min(1, "タグ名を入力してください。").max(40, "タグ名は40文字以内で入力してください。");
+export const tagColorSchema = z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, "有効な色を選択してください。");
 
-export interface TagWithCount extends TagRow {
+export interface TagWithCount extends TagSummary {
   usageCount: number;
 }
 
@@ -27,10 +33,33 @@ function normalizeTagIdentity(name: string) {
   return normalizeTagName(name).toLocaleLowerCase("ja-JP");
 }
 
+function isUniqueViolation(error: { code?: string } | null) {
+  return error?.code === "23505";
+}
+
+function logTagDataError(stage: string, error: SupabaseErrorLike | null | undefined) {
+  console.error("[tags-error]", {
+    error: error
+      ? {
+          code: error.code ?? null,
+          details: error.details ?? null,
+          hint: error.hint ?? null,
+          message: error.message ?? null,
+        }
+      : null,
+    stage,
+  });
+}
+
 export async function listTagsForUser(supabase: TypedSupabaseClient, userId: string) {
-  const { data, error } = await supabase.from("tags").select("*").eq("user_id", userId).order("name", { ascending: true });
+  const { data, error } = await supabase
+    .from("tags")
+    .select("id,name,color")
+    .eq("user_id", userId)
+    .order("name", { ascending: true });
 
   if (error) {
+    logTagDataError("list-tags", error);
     throw new Error("Failed to load tags.");
   }
 
@@ -50,6 +79,7 @@ export async function listTagsWithUsage(supabase: TypedSupabaseClient, userId: s
   );
 
   if (error) {
+    logTagDataError("list-tag-usage", error);
     throw new Error("Failed to load tag usage.");
   }
 
@@ -73,6 +103,7 @@ export async function filterOwnedTagIds(supabase: TypedSupabaseClient, userId: s
   const { data, error } = await supabase.from("tags").select("id").eq("user_id", userId).in("id", tagIds);
 
   if (error) {
+    logTagDataError("filter-owned-tags", error);
     throw new Error("Failed to validate tags.");
   }
 
@@ -110,10 +141,19 @@ export async function createOrGetOwnedTag(
       name,
       user_id: userId,
     })
-    .select("*")
-    .single();
+    .select("id,name,color")
+    .maybeSingle();
+
+  if (isUniqueViolation(error)) {
+    const retryExisting = await findOwnedTagByName(supabase, userId, name);
+
+    if (retryExisting) {
+      return { created: false, tag: retryExisting };
+    }
+  }
 
   if (error || !data) {
+    logTagDataError("create-tag", error);
     throw new Error("Failed to create tag.");
   }
 

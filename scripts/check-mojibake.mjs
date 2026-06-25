@@ -4,8 +4,9 @@ import { fileURLToPath } from "node:url";
 import { readdirSync, statSync } from "node:fs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const checkedExtensions = new Set([".css", ".ts", ".tsx"]);
+const checkedExtensions = new Set([".css", ".json", ".md", ".mjs", ".sql", ".svg", ".ts", ".tsx"]);
 const ignoredDirectories = new Set([".git", ".next", "node_modules"]);
+const ignoredFiles = new Set(["scripts/check-mojibake.mjs", "scripts\\check-mojibake.mjs", "step4-quality-summary.json"]);
 const mojibakePattern = /[縺繧譁隕蜀菫螟譛驕蠕邱]/u;
 const checkedFiles = [];
 const findings = [];
@@ -21,8 +22,13 @@ function walk(directory) {
 
     const path = `${directory}/${entry.name}`;
     const extension = entry.name.slice(entry.name.lastIndexOf("."));
+    const relativePath = relative(root, path);
 
     if (!checkedExtensions.has(extension) || !statSync(path).isFile()) {
+      continue;
+    }
+
+    if (ignoredFiles.has(relativePath)) {
       continue;
     }
 
@@ -31,7 +37,7 @@ function walk(directory) {
 
     lines.forEach((line, index) => {
       if (mojibakePattern.test(line)) {
-        findings.push(`${relative(root, path)}:${index + 1}: ${line.trim()}`);
+        findings.push(`${relativePath}:${index + 1}: ${line.trim()}`);
       }
     });
   }

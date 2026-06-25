@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 
 export function ArchiveButton({
   className,
-  idleLabel = "Archive",
-  pendingLabel = "Working...",
+  idleLabel = "アーカイブ",
+  pendingLabel = "処理中...",
   variant = "outline",
 }: {
   className?: string;
