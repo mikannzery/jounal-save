@@ -113,11 +113,11 @@ async function listTagsByIds(
   return data;
 }
 
-async function attachTags(
+async function attachTags<TClip extends { id: string }>(
   supabase: TypedSupabaseClient,
   userId: string,
-  clips: ClipListRow[],
-): Promise<ClipListWithTags[]> {
+  clips: TClip[],
+): Promise<Array<TClip & { tags: TagSummary[] }>> {
   const clipTags = await listClipTagsForClips(
     supabase,
     clips.map((clip) => clip.id),
