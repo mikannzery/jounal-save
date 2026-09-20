@@ -5,8 +5,13 @@ export type ClipTagRow = Database["public"]["Tables"]["clip_tags"]["Row"];
 export type ClipTagSummary = Pick<ClipTagRow, "clip_id" | "tag_id">;
 export type TagRow = Database["public"]["Tables"]["tags"]["Row"];
 export type TagSummary = Pick<TagRow, "color" | "id" | "name">;
+export type ClipListRow = Pick<ClipRow, "body" | "created_at" | "id" | "is_favorite" | "memo" | "title" | "url">;
 
 export interface ClipWithTags extends ClipRow {
+  tags: TagSummary[];
+}
+
+export interface ClipListWithTags extends ClipListRow {
   tags: TagSummary[];
 }
 

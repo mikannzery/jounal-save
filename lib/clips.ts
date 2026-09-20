@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { ClipRow, ClipTagSummary, ClipWithTags, TagSummary } from "@/types/clip";
+import type { ClipListRow, ClipListWithTags, ClipRow, ClipTagSummary, ClipWithTags, TagSummary } from "@/types/clip";
 import type { Database } from "@/types/database";
 
 type TypedSupabaseClient = SupabaseClient<Database>;
@@ -23,6 +23,7 @@ export type ClipMonthFilter = { month: number; year: number };
 
 const minClipArchiveYear = 2000;
 const maxClipArchiveYear = 9999;
+const clipListColumns = "body,created_at,id,is_favorite,memo,title,url" as const;
 
 export const clipSortOptions: Array<{ label: string; value: ClipSort }> = [
   { label: "作成日 新しい順", value: "created_desc" },
@@ -112,11 +113,11 @@ async function listTagsByIds(
   return data;
 }
 
-async function attachTags(
+async function attachTags<TClip extends { id: string }>(
   supabase: TypedSupabaseClient,
   userId: string,
-  clips: ClipRow[],
-): Promise<ClipWithTags[]> {
+  clips: TClip[],
+): Promise<Array<TClip & { tags: TagSummary[] }>> {
   const clipTags = await listClipTagsForClips(
     supabase,
     clips.map((clip) => clip.id),
@@ -196,7 +197,7 @@ async function listClipsByScope(
     return [] satisfies ClipWithTags[];
   }
 
-  let query = supabase.from("clips").select("*").eq("user_id", userId);
+  let query = supabase.from("clips").select(clipListColumns).eq("user_id", userId);
 
   if (scope === "active") {
     query = query.eq("is_archived", false);
