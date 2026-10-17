@@ -4,7 +4,7 @@ import { ExportMenu } from "@/components/clips/export-menu";
 import { TagFilterBar } from "@/components/clips/tag-filter-bar";
 import { FormMessage } from "@/components/ui/field";
 import { requireUser } from "@/lib/auth";
-import { buildExportHref, listArchivedClips, resolveClipSort, resolveClipView, resolveTagFilter } from "@/lib/clips";
+import { buildExportHref, listArchivedClipsPage, resolveClipPage, resolveClipSort, resolveClipView, resolveTagFilter } from "@/lib/clips";
 import { listTagsWithUsage } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
@@ -42,19 +42,21 @@ export default async function ArchivePage({
 }: Readonly<{
   searchParams: Promise<{
     error?: string;
+    page?: string | string[];
     sort?: string | string[];
     status?: string;
     tag?: string | string[];
     view?: string | string[];
   }>;
 }>) {
-  const { error, sort: rawSort, status, tag: rawTag, view: rawView } = await searchParams;
+  const { error, page: rawPage, sort: rawSort, status, tag: rawTag, view: rawView } = await searchParams;
   const { supabase, user } = await requireUser();
   const sort = resolveClipSort(rawSort);
   const tag = resolveTagFilter(rawTag);
   const view = resolveClipView(rawView);
-  const [clips, tags] = await Promise.all([
-    listArchivedClips(supabase, user.id, sort, tag),
+  const page = resolveClipPage(rawPage);
+  const [clipPage, tags] = await Promise.all([
+    listArchivedClipsPage(supabase, user.id, sort, page, tag),
     listTagsWithUsage(supabase, user.id),
   ]);
   const jsonExportHref = buildExportHref({ format: "json", scope: "archive", sort, tag });
@@ -64,18 +66,20 @@ export default async function ArchivePage({
     <ClipBrowser
       basePath="/archive"
       contentHeader={<TagFilterBar activeTag={tag} basePath="/archive" sort={sort} tags={tags} view={view} />}
-      count={clips.length}
+      count={clipPage.totalCount}
       emptyDescription="アーカイブした記事がここに表示されます。必要なら復元し、不要ならこの画面から完全削除できます。"
       emptyTitle="アーカイブは空です"
       feedback={<ArchiveFeedback error={error} status={status} />}
       heading="アーカイブ"
       label="[アーカイブ]"
+      page={clipPage.page}
+      pagination={clipPage}
       sort={sort}
       tag={tag}
       toolbarExtras={<ExportMenu csvHref={csvExportHref} jsonHref={jsonExportHref} />}
       view={view}
     >
-      {clips.map((clip) => (
+      {clipPage.clips.map((clip) => (
         <ArchivedClipCard clip={clip} key={clip.id} view={view} />
       ))}
     </ClipBrowser>

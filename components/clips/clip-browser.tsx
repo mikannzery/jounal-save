@@ -24,6 +24,8 @@ export function ClipBrowser({
   heading,
   label,
   month,
+  page = 1,
+  pagination,
   selectionMode = false,
   sort,
   tag,
@@ -43,6 +45,8 @@ export function ClipBrowser({
   heading: string;
   label: string;
   month?: number;
+  page?: number;
+  pagination?: { hasNextPage: boolean; hasPreviousPage: boolean };
   selectionMode?: boolean;
   sort: ClipSort;
   tag?: string;
@@ -76,6 +80,7 @@ export function ClipBrowser({
               })}
               href={buildClipBrowseHref(basePath, {
                 month,
+                page,
                 select: selectionMode,
                 sort,
                 tag,
@@ -98,6 +103,7 @@ export function ClipBrowser({
               })}
               href={buildClipBrowseHref(basePath, {
                 month,
+                page,
                 select: selectionMode,
                 sort,
                 tag,
@@ -182,6 +188,26 @@ export function ClipBrowser({
             {children}
           </div>
         )}
+        {pagination && (pagination.hasPreviousPage || pagination.hasNextPage) ? (
+          <nav aria-label="記事一覧のページ移動" className="flex items-center justify-between gap-3 border-t-2 border-[var(--ui-border-soft)] pt-5">
+            {pagination.hasPreviousPage ? (
+              <Link
+                className={buttonStyles({ size: "small", variant: "outline" })}
+                href={buildClipBrowseHref(basePath, { month, page: page - 1, select: selectionMode, sort, tag, view, year })}
+              >
+                前へ
+              </Link>
+            ) : <span />}
+            {pagination.hasNextPage ? (
+              <Link
+                className={buttonStyles({ size: "small", variant: "outline" })}
+                href={buildClipBrowseHref(basePath, { month, page: page + 1, select: selectionMode, sort, tag, view, year })}
+              >
+                次へ
+              </Link>
+            ) : null}
+          </nav>
+        ) : null}
       </div>
     </section>
   );

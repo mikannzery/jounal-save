@@ -11,7 +11,8 @@ import { requireUser } from "@/lib/auth";
 import {
   buildClipBrowseHref,
   buildExportHref,
-  listClips,
+  listClipsPage,
+  resolveClipPage,
   resolveClipMonthFilter,
   resolveClipSort,
   resolveClipView,
@@ -36,6 +37,7 @@ export default async function ClipsPage({
   searchParams: Promise<{
     error?: string;
     month?: string | string[];
+    page?: string | string[];
     select?: string | string[];
     sort?: string | string[];
     tag?: string | string[];
@@ -43,20 +45,21 @@ export default async function ClipsPage({
     year?: string | string[];
   }>;
 }>) {
-  const { error, month: rawMonth, select: rawSelect, sort: rawSort, tag: rawTag, view: rawView, year: rawYear } = await searchParams;
+  const { error, month: rawMonth, page: rawPage, select: rawSelect, sort: rawSort, tag: rawTag, view: rawView, year: rawYear } = await searchParams;
   const { supabase, user } = await requireUser();
   const sort = resolveClipSort(rawSort);
   const tag = resolveTagFilter(rawTag);
   const view = resolveClipView(rawView);
   const selectionMode = resolveSelectionMode(rawSelect);
   const monthFilter = resolveClipMonthFilter(rawYear, rawMonth);
-  const [clips, tags] = await Promise.all([
-    listClips(supabase, user.id, sort, tag, monthFilter),
+  const page = resolveClipPage(rawPage);
+  const [clipPage, tags] = await Promise.all([
+    listClipsPage(supabase, user.id, sort, page, tag, monthFilter),
     listTagsWithUsage(supabase, user.id),
   ]);
 
-  const selectionHref = buildClipBrowseHref("/clips", { month: monthFilter?.month, select: true, sort, tag, view, year: monthFilter?.year });
-  const browseHref = buildClipBrowseHref("/clips", { month: monthFilter?.month, sort, tag, view, year: monthFilter?.year });
+  const selectionHref = buildClipBrowseHref("/clips", { month: monthFilter?.month, page, select: true, sort, tag, view, year: monthFilter?.year });
+  const browseHref = buildClipBrowseHref("/clips", { month: monthFilter?.month, page, sort, tag, view, year: monthFilter?.year });
   const clearMonthHref = buildClipBrowseHref("/clips", { select: selectionMode, sort, tag, view });
   const selectionFormId = "clips-bulk-archive-form";
   const jsonExportHref = buildExportHref({ format: "json", month: monthFilter?.month, scope: "clips", sort, tag, year: monthFilter?.year });
@@ -95,7 +98,7 @@ export default async function ClipsPage({
           ) : null}
         </>
       }
-      count={clips.length}
+      count={clipPage.totalCount}
       emptyActionHref="/clips/new"
       emptyActionLabel="最初の記事を作成"
       emptyDescription={emptyDescription}
@@ -104,6 +107,8 @@ export default async function ClipsPage({
       heading="ALL CLIPS"
       label={`[${monthLabel}]`}
       month={monthFilter?.month}
+      page={clipPage.page}
+      pagination={clipPage}
       selectionMode={selectionMode}
       sort={sort}
       tag={tag}
@@ -125,7 +130,7 @@ export default async function ClipsPage({
       view={view}
       year={monthFilter?.year}
     >
-      {clips.map((clip) => (
+      {clipPage.clips.map((clip) => (
         <ClipCard clip={clip} key={clip.id} selectionFormId={selectionMode ? selectionFormId : undefined} selectionMode={selectionMode} view={view} />
       ))}
     </ClipBrowser>

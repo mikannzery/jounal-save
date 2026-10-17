@@ -4,7 +4,7 @@ import { ArchiveButton } from "@/components/clips/archive-button";
 import { TagChip } from "@/components/ui/tag-chip";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { deleteClipAction, restoreClipAction } from "@/lib/actions/clips";
-import type { ClipWithTags } from "@/types/clip";
+import type { ClipListWithTags } from "@/types/clip";
 import { cn, formatDate, getDomainLabel, getExcerpt, getSafeExternalUrl } from "@/lib/utils";
 
 const clampTitleStyle = {
@@ -25,7 +25,7 @@ export function ArchivedClipCard({
   clip,
   view,
 }: {
-  clip: ClipWithTags;
+  clip: ClipListWithTags;
   view: "grid" | "list";
 }) {
   const restoreAction = restoreClipAction.bind(null, clip.id);

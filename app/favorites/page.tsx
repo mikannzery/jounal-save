@@ -8,7 +8,7 @@ import { Button, buttonStyles } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/field";
 import { bulkArchiveClipsAction } from "@/lib/actions/clips";
 import { requireUser } from "@/lib/auth";
-import { buildClipBrowseHref, buildExportHref, listFavoriteClips, resolveClipSort, resolveClipView, resolveSelectionMode, resolveTagFilter } from "@/lib/clips";
+import { buildClipBrowseHref, buildExportHref, listFavoriteClipsPage, resolveClipPage, resolveClipSort, resolveClipView, resolveSelectionMode, resolveTagFilter } from "@/lib/clips";
 import { listTagsWithUsage } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
@@ -26,24 +26,26 @@ export default async function FavoritesPage({
 }: Readonly<{
   searchParams: Promise<{
     error?: string;
+    page?: string | string[];
     select?: string | string[];
     sort?: string | string[];
     tag?: string | string[];
     view?: string | string[];
   }>;
 }>) {
-  const { error, select: rawSelect, sort: rawSort, tag: rawTag, view: rawView } = await searchParams;
+  const { error, page: rawPage, select: rawSelect, sort: rawSort, tag: rawTag, view: rawView } = await searchParams;
   const { supabase, user } = await requireUser();
   const sort = resolveClipSort(rawSort);
   const tag = resolveTagFilter(rawTag);
   const view = resolveClipView(rawView);
   const selectionMode = resolveSelectionMode(rawSelect);
-  const [clips, tags] = await Promise.all([
-    listFavoriteClips(supabase, user.id, sort, tag),
+  const page = resolveClipPage(rawPage);
+  const [clipPage, tags] = await Promise.all([
+    listFavoriteClipsPage(supabase, user.id, sort, page, tag),
     listTagsWithUsage(supabase, user.id),
   ]);
-  const selectionHref = buildClipBrowseHref("/favorites", { select: true, sort, tag, view });
-  const browseHref = buildClipBrowseHref("/favorites", { sort, tag, view });
+  const selectionHref = buildClipBrowseHref("/favorites", { page, select: true, sort, tag, view });
+  const browseHref = buildClipBrowseHref("/favorites", { page, sort, tag, view });
   const selectionFormId = "favorites-bulk-archive-form";
   const jsonExportHref = buildExportHref({ format: "json", scope: "favorites", sort, tag });
   const csvExportHref = buildExportHref({ format: "csv", scope: "favorites", sort, tag });
@@ -64,12 +66,14 @@ export default async function FavoritesPage({
           ) : null}
         </>
       }
-      count={clips.length}
+      count={clipPage.totalCount}
       emptyDescription="気になった記事をお気に入りに追加すると、ここにまとまって表示されます。"
       emptyTitle="お気に入りはまだありません"
       feedback={<FavoritesFeedback error={error} />}
       heading="お気に入り"
       label="[お気に入り]"
+      page={clipPage.page}
+      pagination={clipPage}
       selectionMode={selectionMode}
       sort={sort}
       tag={tag}
@@ -86,14 +90,14 @@ export default async function FavoritesPage({
           >
             {selectionMode ? "選択中" : "選択"}
           </Link>
-          {clips.length > 0 ? (
+          {clipPage.totalCount > 0 ? (
             <Link className={buttonStyles({ size: "small", variant: "outline" })} href="/clips">一覧へ戻る</Link>
           ) : null}
         </>
       }
       view={view}
     >
-      {clips.map((clip) => (
+      {clipPage.clips.map((clip) => (
         <ClipCard clip={clip} key={clip.id} selectionFormId={selectionMode ? selectionFormId : undefined} selectionMode={selectionMode} view={view} />
       ))}
     </ClipBrowser>

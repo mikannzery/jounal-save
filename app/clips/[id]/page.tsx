@@ -74,7 +74,7 @@ export default async function ClipDetailPage({
         {imageUrl ? (
           <div className="overflow-hidden border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img alt="" className="max-h-[28rem] w-full object-cover" src={imageUrl} />
+            <img alt="" className="max-h-[28rem] w-full object-cover" decoding="async" loading="lazy" src={imageUrl} />
           </div>
         ) : (
           <div className="flex min-h-56 items-center justify-center border-2 border-[var(--ui-border)] bg-[var(--tag-neutral-bg)] text-xs font-semibold uppercase tracking-[0.24em] text-[var(--ui-muted)]">
