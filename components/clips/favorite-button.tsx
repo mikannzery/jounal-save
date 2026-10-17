@@ -1,7 +1,3 @@
-"use client";
-
-import { useFormStatus } from "react-dom";
-
 import { Button } from "@/components/ui/button";
 import { StarIcon } from "@/components/ui/icons";
 
@@ -16,7 +12,6 @@ export function FavoriteButton({
   fullWidth?: boolean;
   size?: "default" | "icon" | "small";
 }) {
-  const { pending } = useFormStatus();
   const label = active ? "お気に入りを解除" : "お気に入りに追加";
 
   return (
@@ -33,13 +28,12 @@ export function FavoriteButton({
               : "bg-[var(--ui-fg)] text-[var(--ui-bg)] hover:opacity-80"
             : className
       }
-      disabled={pending}
       size={size}
       title={label}
       type="submit"
       variant="outline"
     >
-      <StarIcon active={active && !pending} className={pending ? "opacity-45" : undefined} />
+      <StarIcon active={active} />
       {fullWidth ? <span>{active ? "お気に入り済み" : "お気に入り"}</span> : null}
     </Button>
   );

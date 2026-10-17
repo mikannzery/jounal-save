@@ -20,6 +20,10 @@ export interface TagWithCount extends TagSummary {
   usageCount: number;
 }
 
+type TagWithUsageQueryResult = TagSummary & {
+  clip_tags: Array<{ count: number }>;
+};
+
 export function normalizeTagName(name: string) {
   return name.trim();
 }
@@ -67,31 +71,22 @@ export async function listTagsForUser(supabase: TypedSupabaseClient, userId: str
 }
 
 export async function listTagsWithUsage(supabase: TypedSupabaseClient, userId: string): Promise<TagWithCount[]> {
-  const tags = await listTagsForUser(supabase, userId);
-
-  if (tags.length === 0) {
-    return [];
-  }
-
-  const { data: clipTags, error } = await supabase.from("clip_tags").select("tag_id").in(
-    "tag_id",
-    tags.map((tag) => tag.id),
-  );
+  const { data, error } = await supabase
+    .from("tags")
+    .select("id,name,color,clip_tags(count)")
+    .eq("user_id", userId)
+    .order("name", { ascending: true });
 
   if (error) {
     logTagDataError("list-tag-usage", error);
     throw new Error("Failed to load tag usage.");
   }
 
-  const counts = new Map<string, number>();
-
-  for (const clipTag of clipTags) {
-    counts.set(clipTag.tag_id, (counts.get(clipTag.tag_id) ?? 0) + 1);
-  }
-
-  return tags.map((tag) => ({
-    ...tag,
-    usageCount: counts.get(tag.id) ?? 0,
+  return ((data ?? []) as unknown as TagWithUsageQueryResult[]).map((tag) => ({
+    color: tag.color,
+    id: tag.id,
+    name: tag.name,
+    usageCount: tag.clip_tags[0]?.count ?? 0,
   }));
 }
 

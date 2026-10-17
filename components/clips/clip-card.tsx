@@ -7,7 +7,7 @@ import { PencilIcon } from "@/components/ui/icons";
 import { TagChip } from "@/components/ui/tag-chip";
 import { setFavoriteClipAction } from "@/lib/actions/clips";
 import { cn, formatDate, getDomainLabel, getExcerpt, getSafeExternalUrl } from "@/lib/utils";
-import type { ClipWithTags } from "@/types/clip";
+import type { ClipListWithTags } from "@/types/clip";
 
 const clampTitleStyle = {
   WebkitBoxOrient: "vertical" as const,
@@ -29,7 +29,7 @@ export function ClipCard({
   selectionMode = false,
   view = "grid",
 }: {
-  clip: ClipWithTags;
+  clip: ClipListWithTags;
   selectionFormId?: string;
   selectionMode?: boolean;
   view?: "grid" | "list";

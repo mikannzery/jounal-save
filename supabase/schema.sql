@@ -41,6 +41,12 @@ create index if not exists clips_user_archived_idx on public.clips (user_id, is_
 create index if not exists clips_user_archived_updated_idx on public.clips (user_id, is_archived, updated_at desc);
 create index if not exists clips_user_archived_title_idx on public.clips (user_id, is_archived, title);
 create index if not exists clips_user_favorite_idx on public.clips (user_id, is_favorite, is_archived, updated_at desc);
+create index if not exists clips_user_archived_created_id_idx on public.clips (user_id, is_archived, created_at desc, id desc);
+create index if not exists clips_user_archived_updated_id_idx on public.clips (user_id, is_archived, updated_at desc, id desc);
+create index if not exists clips_user_archived_title_id_idx on public.clips (user_id, is_archived, title, id);
+create index if not exists clips_user_favorite_created_id_idx on public.clips (user_id, is_favorite, is_archived, created_at desc, id desc);
+create index if not exists clips_user_favorite_updated_id_idx on public.clips (user_id, is_favorite, is_archived, updated_at desc, id desc);
+create index if not exists clips_user_favorite_title_id_idx on public.clips (user_id, is_favorite, is_archived, title, id);
 create index if not exists clip_tags_clip_id_idx on public.clip_tags (clip_id);
 create index if not exists clip_tags_tag_id_idx on public.clip_tags (tag_id);
 create unique index if not exists clip_tags_clip_id_tag_id_idx on public.clip_tags (clip_id, tag_id);

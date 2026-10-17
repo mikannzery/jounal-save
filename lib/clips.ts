@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { ClipRow, ClipTagSummary, ClipWithTags, TagSummary } from "@/types/clip";
+import type { ClipListRow, ClipListWithTags, ClipRow, ClipTagSummary, ClipWithTags, TagSummary } from "@/types/clip";
 import type { Database } from "@/types/database";
 
 type TypedSupabaseClient = SupabaseClient<Database>;
@@ -20,9 +20,18 @@ export type ClipSort =
   | "title_desc";
 export type ClipView = "grid" | "list";
 export type ClipMonthFilter = { month: number; year: number };
+export type ClipListPage = {
+  clips: ClipListWithTags[];
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  page: number;
+  totalCount: number;
+};
 
 const minClipArchiveYear = 2000;
 const maxClipArchiveYear = 9999;
+const clipListColumns = "body,created_at,id,is_favorite,memo,title,updated_at,url" as const;
+const clipListPageSize = 30;
 
 export const clipSortOptions: Array<{ label: string; value: ClipSort }> = [
   { label: "作成日 新しい順", value: "created_desc" },
@@ -53,18 +62,18 @@ function applySort<TQuery extends { order: (column: string, options: { ascending
 ) {
   switch (sort) {
     case "created_asc":
-      return query.order("created_at", { ascending: true });
+      return query.order("created_at", { ascending: true }).order("id", { ascending: true });
     case "updated_desc":
-      return query.order("updated_at", { ascending: false });
+      return query.order("updated_at", { ascending: false }).order("id", { ascending: false });
     case "updated_asc":
-      return query.order("updated_at", { ascending: true });
+      return query.order("updated_at", { ascending: true }).order("id", { ascending: true });
     case "title_asc":
-      return query.order("title", { ascending: true });
+      return query.order("title", { ascending: true }).order("id", { ascending: true });
     case "title_desc":
-      return query.order("title", { ascending: false });
+      return query.order("title", { ascending: false }).order("id", { ascending: false });
     case "created_desc":
     default:
-      return query.order("created_at", { ascending: false });
+      return query.order("created_at", { ascending: false }).order("id", { ascending: false });
   }
 }
 
@@ -112,11 +121,11 @@ async function listTagsByIds(
   return data;
 }
 
-async function attachTags(
+async function attachTags<TClip extends { id: string }>(
   supabase: TypedSupabaseClient,
   userId: string,
-  clips: ClipRow[],
-): Promise<ClipWithTags[]> {
+  clips: TClip[],
+): Promise<Array<TClip & { tags: TagSummary[] }>> {
   const clipTags = await listClipTagsForClips(
     supabase,
     clips.map((clip) => clip.id),
@@ -144,7 +153,7 @@ async function attachTags(
   }));
 }
 
-async function resolveTagClipIds(
+async function resolveTagId(
   supabase: TypedSupabaseClient,
   userId: string,
   tagName?: string,
@@ -166,20 +175,10 @@ async function resolveTagClipIds(
   }
 
   if (!tag) {
-    return [] as string[];
+    return null;
   }
 
-  const { data: clipTags, error: clipTagError } = await supabase
-    .from("clip_tags")
-    .select("clip_id")
-    .eq("tag_id", tag.id);
-
-  if (clipTagError) {
-    logClipDataError("resolve-tag-filter:clip-tags", clipTagError);
-    throw new Error("Failed to resolve tag filter.");
-  }
-
-  return clipTags.map((item) => item.clip_id);
+  return tag.id;
 }
 
 async function listClipsByScope(
@@ -190,13 +189,14 @@ async function listClipsByScope(
   tagName?: string,
   monthFilter?: ClipMonthFilter,
 ) {
-  const clipIds = await resolveTagClipIds(supabase, userId, tagName);
+  const tagId = await resolveTagId(supabase, userId, tagName);
 
-  if (clipIds && clipIds.length === 0) {
+  if (tagName && !tagId) {
     return [] satisfies ClipWithTags[];
   }
 
-  let query = supabase.from("clips").select("*").eq("user_id", userId);
+  const selectColumns = tagId ? "*,clip_tags!inner(tag_id)" : "*";
+  let query = supabase.from("clips").select(selectColumns).eq("user_id", userId);
 
   if (scope === "active") {
     query = query.eq("is_archived", false);
@@ -210,8 +210,8 @@ async function listClipsByScope(
     query = query.eq("is_archived", false).eq("is_favorite", true);
   }
 
-  if (clipIds) {
-    query = query.in("id", clipIds);
+  if (tagId) {
+    query = query.eq("clip_tags.tag_id", tagId);
   }
 
   if (monthFilter) {
@@ -227,7 +227,67 @@ async function listClipsByScope(
     throw new Error("Failed to load clips.");
   }
 
-  return attachTags(supabase, userId, data);
+  return attachTags(supabase, userId, data as unknown as ClipRow[]);
+}
+
+async function listClipsPageByScope(
+  supabase: TypedSupabaseClient,
+  userId: string,
+  scope: "active" | "archived" | "favorite",
+  sort: ClipSort,
+  page: number,
+  tagName?: string,
+  monthFilter?: ClipMonthFilter,
+): Promise<ClipListPage> {
+  const tagId = await resolveTagId(supabase, userId, tagName);
+
+  if (tagName && !tagId) {
+    return { clips: [], hasNextPage: false, hasPreviousPage: false, page, totalCount: 0 };
+  }
+
+  const selectColumns = tagId ? `${clipListColumns},clip_tags!inner(tag_id)` : clipListColumns;
+  let query = supabase.from("clips").select(selectColumns, { count: "exact" }).eq("user_id", userId);
+
+  if (scope === "active") {
+    query = query.eq("is_archived", false);
+  }
+
+  if (scope === "archived") {
+    query = query.eq("is_archived", true);
+  }
+
+  if (scope === "favorite") {
+    query = query.eq("is_archived", false).eq("is_favorite", true);
+  }
+
+  if (tagId) {
+    query = query.eq("clip_tags.tag_id", tagId);
+  }
+
+  if (monthFilter) {
+    const rangeStart = new Date(monthFilter.year, monthFilter.month - 1, 1).toISOString();
+    const rangeEnd = new Date(monthFilter.year, monthFilter.month, 1).toISOString();
+    query = query.gte("created_at", rangeStart).lt("created_at", rangeEnd);
+  }
+
+  const rangeStart = (page - 1) * clipListPageSize;
+  const { count, data, error } = await applySort(query, sort).range(rangeStart, rangeStart + clipListPageSize - 1);
+
+  if (error) {
+    logClipDataError("list-clips-page", error);
+    throw new Error("Failed to load clips.");
+  }
+
+  const totalCount = count ?? 0;
+  const clips = await attachTags(supabase, userId, data as unknown as ClipListRow[]);
+
+  return {
+    clips,
+    hasNextPage: rangeStart + clips.length < totalCount,
+    hasPreviousPage: page > 1,
+    page,
+    totalCount,
+  };
 }
 
 export function resolveClipSort(value: string | string[] | undefined): ClipSort {
@@ -299,10 +359,16 @@ export function resolveSelectionMode(value: string | string[] | undefined) {
   return normalized === "on";
 }
 
+export function resolveClipPage(value: string | string[] | undefined) {
+  const page = Number(Array.isArray(value) ? value[0] : value);
+  return Number.isSafeInteger(page) && page > 0 ? page : 1;
+}
+
 export function buildClipBrowseHref(
   basePath: string,
   options: {
     month?: number;
+    page?: number;
     select?: boolean;
     sort: ClipSort;
     tag?: string;
@@ -320,6 +386,10 @@ export function buildClipBrowseHref(
 
   if (options.select) {
     params.set("select", "on");
+  }
+
+  if (options.page && options.page > 1) {
+    params.set("page", String(options.page));
   }
 
   if (options.year && options.month) {
@@ -365,6 +435,17 @@ export async function listClips(
   return listClipsByScope(supabase, userId, "active", sort, tagName, monthFilter);
 }
 
+export async function listClipsPage(
+  supabase: TypedSupabaseClient,
+  userId: string,
+  sort: ClipSort = "created_desc",
+  page = 1,
+  tagName?: string,
+  monthFilter?: ClipMonthFilter,
+) {
+  return listClipsPageByScope(supabase, userId, "active", sort, page, tagName, monthFilter);
+}
+
 export async function listArchivedClips(
   supabase: TypedSupabaseClient,
   userId: string,
@@ -375,6 +456,17 @@ export async function listArchivedClips(
   return listClipsByScope(supabase, userId, "archived", sort, tagName, monthFilter);
 }
 
+export async function listArchivedClipsPage(
+  supabase: TypedSupabaseClient,
+  userId: string,
+  sort: ClipSort = "updated_desc",
+  page = 1,
+  tagName?: string,
+  monthFilter?: ClipMonthFilter,
+) {
+  return listClipsPageByScope(supabase, userId, "archived", sort, page, tagName, monthFilter);
+}
+
 export async function listFavoriteClips(
   supabase: TypedSupabaseClient,
   userId: string,
@@ -383,6 +475,17 @@ export async function listFavoriteClips(
   monthFilter?: ClipMonthFilter,
 ) {
   return listClipsByScope(supabase, userId, "favorite", sort, tagName, monthFilter);
+}
+
+export async function listFavoriteClipsPage(
+  supabase: TypedSupabaseClient,
+  userId: string,
+  sort: ClipSort = "updated_desc",
+  page = 1,
+  tagName?: string,
+  monthFilter?: ClipMonthFilter,
+) {
+  return listClipsPageByScope(supabase, userId, "favorite", sort, page, tagName, monthFilter);
 }
 
 export async function listClipMonthCountsForUser(
